@@ -1,0 +1,37 @@
+name: dinoxo_gamers
+description: "Dinoxo Gamers - PlayStation, Nintendo & Xbox Deals, Price History and Dinoxo Store USA"
+publish_to: 'none'
+version: 1.2.0+3
+
+environment:
+  sdk: ^3.5.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  supabase_flutter: ^2.8.0
+  sqflite: ^2.3.3+1
+  path_provider: ^2.1.4
+  path: ^1.9.0
+  intl: ^0.20.2
+  shared_preferences: ^2.3.2
+  image_picker: ^1.1.2
+  uuid: ^4.5.1
+  url_launcher: ^6.3.0
+  cupertino_icons: ^1.0.8
+  http: ^1.2.2
+  html: ^0.15.4
+  flutter_local_notifications: ^17.2.3
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  sqflite_common_ffi: ^2.4.3
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/
