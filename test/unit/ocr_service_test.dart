@@ -25,4 +25,14 @@ void main() {
     expect(() => OcrService.recognizeText('/camera/pokemon.jpg'),
         throwsA(isA<PlatformException>()));
   });
+  test('joins a split cover title and excludes console and rating text',
+      () async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(OcrService.channel,
+            (_) async => ['Nintendo Switch', 'Pokémon', 'Scarlet', 'ESRB E']);
+    final titles = await OcrService.recognizeText('/gallery/cover.jpg');
+    expect(titles, contains('Pokémon Scarlet'));
+    expect(titles, isNot(contains('Nintendo Switch')));
+    expect(titles, isNot(contains('ESRB E')));
+  });
 }

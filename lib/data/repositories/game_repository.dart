@@ -1,8 +1,10 @@
+import 'package:flutter/foundation.dart';
 import '../../core/constants/app_constants.dart';
 import '../../domain/models/game.dart';
 import '../../domain/models/price_observation.dart';
 import '../../domain/models/user_alert.dart';
 import '../../domain/services/notification_service.dart';
+import '../../domain/services/price_alert_scheduler.dart';
 import '../datasources/local_database_service.dart';
 import '../datasources/web_scraper_service.dart';
 
@@ -41,15 +43,22 @@ class GameFilterOptions {
       genre != null;
 }
 
-class GameRepository {
+class GameRepository extends ChangeNotifier {
   final LocalDatabaseService _localDb;
   final LiveWebScraperService _web;
   List<Game> _cachedCatalog = [];
   bool _loadedCache = false;
+  final Future<bool> Function(UserAlert alert, double price) _notifyPrice;
 
-  GameRepository({LocalDatabaseService? localDb, LiveWebScraperService? web})
+  GameRepository(
+      {LocalDatabaseService? localDb,
+      LiveWebScraperService? web,
+      Future<bool> Function(UserAlert alert, double price)? notifyPrice})
       : _localDb = localDb ?? LocalDatabaseService.instance,
-        _web = web ?? LiveWebScraperService();
+        _web = web ?? LiveWebScraperService(),
+        _notifyPrice = notifyPrice ??
+            ((alert, price) => NotificationService.instance
+                .showPriceAlertNotification(alert: alert, newPrice: price));
 
   Future<List<Game>> getGames({GameFilterOptions? filters}) async {
     List<Game> results = List<Game>.from(_cachedCatalog);
@@ -181,18 +190,23 @@ class GameRepository {
           games.expand((g) => g.editions).where((e) => e.id == alert.editionId);
       if (editions.isEmpty) continue;
       final edition = editions.first;
-      if (edition.currentPrice > alert.targetPrice ||
+      if (!edition.currentPrice.isFinite ||
+          edition.currentPrice < 0 ||
+          (edition.currentPrice * 100).round() >
+              (alert.targetPrice * 100).round() ||
           alert.lastNotifiedAt != null &&
               DateTime.now().difference(alert.lastNotifiedAt!).inHours < 24) {
         continue;
       }
-      final sent = await NotificationService.instance
-          .showPriceAlertNotification(
-              alert: alert, newPrice: edition.currentPrice);
-      if (sent) {
-        await _localDb
-            .saveAlert(alert.copyWith(lastNotifiedAt: DateTime.now()));
+      final claim = DateTime.now();
+      if (!await _localDb.claimNotification(alert, claim)) continue;
+      var sent = false;
+      try {
+        sent = await _notifyPrice(alert, edition.currentPrice);
+      } finally {
+        if (!sent) await _localDb.releaseNotification(alert, claim);
       }
+      if (sent) notifyListeners();
     }
   }
 
@@ -263,16 +277,29 @@ class GameRepository {
   }
 
   Future<void> saveAlert(UserAlert alert) async {
+    if (!alert.targetPrice.isFinite || alert.targetPrice < 0) {
+      throw ArgumentError('El precio objetivo debe ser un importe válido.');
+    }
     await _localDb.saveAlert(alert);
+    notifyListeners();
+    await synchronizeAlertMonitoring();
   }
 
   Future<void> deleteAlert(String id) async {
     await _localDb.deleteAlert(id);
+    notifyListeners();
+    await synchronizeAlertMonitoring();
   }
 
   Future<void> toggleAlertActive(String id, bool isActive) async {
     await _localDb.toggleAlertActive(id, isActive);
+    notifyListeners();
+    await synchronizeAlertMonitoring();
   }
+
+  Future<void> synchronizeAlertMonitoring() async =>
+      PriceAlertScheduler.instance.synchronize(
+          hasActiveAlerts: (await getAlerts()).any((alert) => alert.isActive));
 
   // --- LIBRARY ---
   Future<List<Game>> getOwnedGames() async {

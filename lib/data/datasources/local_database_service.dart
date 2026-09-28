@@ -240,6 +240,27 @@ class LocalDatabaseService {
     await db.delete('user_alerts', where: 'id = ?', whereArgs: [id]);
   }
 
+  /// Atomic claim shared by foreground and background isolates. A failed
+  /// notification releases the claim, so quiet hours/denial can retry later.
+  Future<bool> claimNotification(UserAlert alert, DateTime now) async {
+    final db = await database;
+    final cutoff = now.subtract(const Duration(hours: 24)).toIso8601String();
+    final updated = await db.rawUpdate(
+        '''UPDATE user_alerts SET last_notified_at = ?
+      WHERE id = ? AND is_active = 1 AND target_price = ?
+      AND (last_notified_at IS NULL OR last_notified_at <= ?)''',
+        [now.toIso8601String(), alert.id, alert.targetPrice, cutoff]);
+    return updated == 1;
+  }
+
+  Future<void> releaseNotification(UserAlert alert, DateTime claim) async {
+    final db = await database;
+    await db.update('user_alerts',
+        {'last_notified_at': alert.lastNotifiedAt?.toIso8601String()},
+        where: 'id = ? AND last_notified_at = ?',
+        whereArgs: [alert.id, claim.toIso8601String()]);
+  }
+
   Future<void> toggleAlertActive(String id, bool isActive) async {
     final db = await database;
     await db.update(

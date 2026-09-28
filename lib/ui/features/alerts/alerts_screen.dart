@@ -45,7 +45,14 @@ class _AlertsScreenState extends State<AlertsScreen> {
   @override
   void initState() {
     super.initState();
+    widget.repository.addListener(_loadAlerts);
     _loadAlerts();
+  }
+
+  @override
+  void dispose() {
+    widget.repository.removeListener(_loadAlerts);
+    super.dispose();
   }
 
   Future<void> _loadAlerts() async {
@@ -76,10 +83,6 @@ class _AlertsScreenState extends State<AlertsScreen> {
           style: const TextStyle(color: AppTheme.textSecondary),
         ),
         actions: [
-          IconButton(
-              tooltip: 'Consultar precios ahora',
-              onPressed: _checking ? null : _checkPrices,
-              icon: const Icon(Icons.refresh)),
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
             child: const Text('Cancelar'),
@@ -127,6 +130,10 @@ class _AlertsScreenState extends State<AlertsScreen> {
         title: const Text('Mis Alertas de Precios'),
         actions: [
           IconButton(
+              tooltip: 'Consultar precios ahora',
+              onPressed: _checking ? null : _checkPrices,
+              icon: const Icon(Icons.refresh)),
+          IconButton(
             icon: const Icon(Icons.notifications_none),
             tooltip: 'Configurar permisos de notificación',
             onPressed: _testNotificationPermission,
@@ -155,7 +162,7 @@ class _AlertsScreenState extends State<AlertsScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Consulta de alertas desde la app',
+                        'Alertas de precio activas',
                         style: TextStyle(
                           color: AppTheme.textPrimary,
                           fontSize: 12,
@@ -164,7 +171,7 @@ class _AlertsScreenState extends State<AlertsScreen> {
                       ),
                       SizedBox(height: 3),
                       Text(
-                        'Pulsa actualizar para consultar tus juegos. También se revisa el precio al abrir una ficha o cargar ofertas. La app cerrada no comprueba precios. Las notificaciones requieren permiso y respetan el silencio de 22:00 a 08:00.',
+                        'Android revisa los juegos con conexión aproximadamente cada 15 minutos, incluso en segundo plano. El sistema puede retrasar la revisión. Pulsa actualizar para consultar ahora. Los avisos necesitan permiso y respetan el silencio de 22:00 a 08:00.',
                         style: TextStyle(
                             color: AppTheme.textSecondary,
                             fontSize: 11,

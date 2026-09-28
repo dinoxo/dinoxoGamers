@@ -18,6 +18,9 @@ class _Web extends LiveWebScraperService {
           offerHtml(price: cents),
           Uri.parse('https://www.dekudeals.com/items/example?country=us'),
           now));
+  @override
+  Future<List<Game>> fetchGame(Game game) async =>
+      (await searchWebGames('Example')).games;
 }
 
 void main() {
@@ -85,5 +88,78 @@ void main() {
     expect((await local.getAlerts()).single.lastNotifiedAt, stamp);
     await local.deleteAlert('a');
     expect(await local.getAlerts(), isEmpty);
+  });
+  test(
+      'exact target notifies once, persists cooldown and checks prices after restart',
+      () async {
+    final web = _Web();
+    final sent = <double>[];
+    final repo = GameRepository(
+        localDb: local,
+        web: web,
+        notifyPrice: (alert, price) async {
+          sent.add(price);
+          return true;
+        });
+    final game = (await repo.searchOnline('Example')).games.single;
+    final alert = UserAlert(
+        id: 'target',
+        gameId: game.id,
+        editionId: game.primaryEdition!.id,
+        gameTitle: game.title,
+        platform: game.platform,
+        editionName: 'Estándar',
+        targetPrice: 9.99,
+        createdAt: DateTime.now());
+    await repo.saveAlert(alert);
+    web.cents = 1000;
+    await repo.refreshAlertPrices();
+    expect(sent, isEmpty);
+    web.cents = 999;
+    final restarted = GameRepository(
+        localDb: local,
+        web: web,
+        notifyPrice: (alert, price) async {
+          sent.add(price);
+          return true;
+        });
+    await restarted.refreshAlertPrices();
+    expect(sent, [9.99]);
+    expect((await local.getAlerts()).single.lastNotifiedAt, isNotNull);
+    await Future.wait(
+        [repo.refreshAlertPrices(), restarted.refreshAlertPrices()]);
+    expect(sent, [9.99]);
+    await local.toggleAlertActive('target', false);
+    await repo.refreshAlertPrices();
+    expect(sent, [9.99]);
+  });
+  test('denied notification releases the claim so a later check can deliver',
+      () async {
+    final web = _Web()..cents = 743;
+    var permitted = false;
+    var delivered = 0;
+    final repo = GameRepository(
+        localDb: local,
+        web: web,
+        notifyPrice: (alert, price) async {
+          if (permitted) delivered++;
+          return permitted;
+        });
+    final game = (await repo.searchOnline('Example')).games.single;
+    await repo.saveAlert(UserAlert(
+        id: 'denied',
+        gameId: game.id,
+        editionId: game.primaryEdition!.id,
+        gameTitle: game.title,
+        platform: game.platform,
+        editionName: 'Estándar',
+        targetPrice: 7.43,
+        createdAt: DateTime.now()));
+    await repo.refreshAlertPrices();
+    expect((await local.getAlerts()).single.lastNotifiedAt, isNull);
+    permitted = true;
+    await repo.refreshAlertPrices();
+    expect(delivered, 1);
+    expect((await local.getAlerts()).single.lastNotifiedAt, isNotNull);
   });
 }

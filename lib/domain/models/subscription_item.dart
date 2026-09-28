@@ -7,19 +7,25 @@ enum SubscriptionTier {
   psPremium('PS Plus Premium (Clásicos)', GamePlatform.playstation),
 
   // Xbox
-  xboxUltimate('Game Pass Ultimate / PC', GamePlatform.xbox),
-  xboxStandard('Game Pass Standard', GamePlatform.xbox),
-  xboxCore('Game Pass Core', GamePlatform.xbox),
+  xboxUltimate('Game Pass Ultimate', GamePlatform.xbox),
+  xboxStandard('Game Pass Premium', GamePlatform.xbox),
+  xboxCore('Game Pass Essential', GamePlatform.xbox),
   eaPlay('EA Play (Incluido en GP Ultimate)', GamePlatform.xbox),
 
   // Nintendo
   nsoStandard('Nintendo Switch Online (NES/SNES/GB)', GamePlatform.nintendo),
-  nsoExpansion('NSO + Paquete de Expansión (N64/GBA/DLCs)', GamePlatform.nintendo);
+  nsoExpansion('NSO + Paquete de Expansión', GamePlatform.nintendo);
 
   final String displayName;
   final GamePlatform platform;
 
   const SubscriptionTier(this.displayName, this.platform);
+
+  int get rank => switch (this) {
+        psEssential || xboxCore || nsoStandard => 0,
+        psExtra || xboxStandard || nsoExpansion || eaPlay => 1,
+        psPremium || xboxUltimate => 2,
+      };
 }
 
 enum SubscriptionStatus {
@@ -32,12 +38,12 @@ enum SubscriptionStatus {
 }
 
 enum SubscriptionCategory {
-  all('Todos'),
-  monthly('Juegos del Mes'),
+  all('Disponibles ahora'),
+  monthly('Altas del mes'),
   catalog('Catálogo'),
   classics('Clásicos / Retro'),
   leavingSoon('Saliendo Pronto'),
-  comingSoon('Próximamente');
+  comingSoon('Mes siguiente');
 
   final String label;
   const SubscriptionCategory(this.label);
@@ -56,6 +62,11 @@ class SubscriptionItem {
   final String? expiryDate;
   final String? releaseDate;
   final String? officialStoreUrl;
+  final String sourceUrl;
+  final DateTime? checkedAt;
+  final DateTime? addedAt;
+  final DateTime? availableUntil;
+  final bool availabilityConfirmed;
 
   const SubscriptionItem({
     required this.id,
@@ -70,7 +81,38 @@ class SubscriptionItem {
     this.expiryDate,
     this.releaseDate,
     this.officialStoreUrl,
+    this.sourceUrl = '',
+    this.checkedAt,
+    this.addedAt,
+    this.availableUntil,
+    this.availabilityConfirmed = true,
   });
+
+  bool availableAt(DateTime now) =>
+      availabilityConfirmed &&
+      status != SubscriptionStatus.comingSoon &&
+      (addedAt == null || !addedAt!.isAfter(now)) &&
+      (availableUntil == null || now.isBefore(availableUntil!));
+
+  SubscriptionItem withAnnouncement(SubscriptionItem announcement) =>
+      SubscriptionItem(
+          id: id,
+          title: title,
+          platform: platform,
+          tier: tier,
+          status: status,
+          category: category,
+          coverUrl: coverUrl,
+          consoles: consoles,
+          officialStoreUrl: officialStoreUrl,
+          sourceUrl: sourceUrl,
+          checkedAt: checkedAt,
+          addedAt: announcement.addedAt,
+          availableUntil: announcement.availableUntil,
+          releaseDate: announcement.releaseDate,
+          expiryDate: announcement.expiryDate,
+          statusNote: announcement.statusNote,
+          availabilityConfirmed: availabilityConfirmed);
 
   String get serviceName {
     switch (platform) {
@@ -102,7 +144,7 @@ class SubscriptionItem {
       case SubscriptionTier.xboxStandard:
         return 'Game Pass';
       case SubscriptionTier.xboxCore:
-        return 'Game Pass Core';
+        return 'Game Pass Essential';
       case SubscriptionTier.eaPlay:
         return 'EA Play / Game Pass';
       case SubscriptionTier.nsoStandard:
@@ -115,12 +157,15 @@ class SubscriptionItem {
 
 class SubscriptionMatch {
   final SubscriptionItem item;
+  final DateTime? verifiedAt;
 
-  const SubscriptionMatch({required this.item});
+  const SubscriptionMatch({required this.item, this.verifiedAt});
 
-  bool get isIncluded => item.status == SubscriptionStatus.included;
+  bool get isIncluded => item.availableAt(verifiedAt ?? DateTime.now());
   bool get isLeavingSoon => item.status == SubscriptionStatus.leavingSoon;
-  bool get isComingSoon => item.status == SubscriptionStatus.comingSoon;
+  bool get isComingSoon =>
+      item.status == SubscriptionStatus.comingSoon ||
+      item.addedAt?.isAfter(verifiedAt ?? DateTime.now()) == true;
 
   String get advisoryTitle {
     if (isLeavingSoon) {
@@ -129,7 +174,7 @@ class SubscriptionMatch {
     if (isComingSoon) {
       return '⏳ Próximamente en ${item.serviceName}';
     }
-    return '💡 Te recomendamos no comprar este juego';
+    return 'Comprueba tu membresía antes de comprar';
   }
 
   String get advisoryMessage {
@@ -139,6 +184,6 @@ class SubscriptionMatch {
     if (isComingSoon) {
       return 'Este título llegará próximamente al catálogo de ${item.serviceName} (${item.tier.displayName})${item.statusNote != null ? ' (${item.statusNote})' : ''}. Si estás suscrito o pensás suscribirte, te sugerimos esperar y no gastar de más.';
     }
-    return 'Este juego está incluido actualmente en ${item.serviceName} (${item.tier.displayName}). Si tenés esta suscripción de ${AppConstants.platformDisplayName(item.platform)}, ¡podés jugarlo gratis sin comprarlo!';
+    return 'La fuente USA incluye este juego en ${item.tier.displayName}. Si tienes ese nivel activo, puedes jugar la versión incluida sin comprarla. Comprueba la edición y los complementos: la app no tiene acceso a tu cuenta ni a los juegos que reclamaste antes.';
   }
 }

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../domain/services/ocr_service.dart';
@@ -11,7 +12,15 @@ import '../game_details/game_details_screen.dart';
 
 class SearchScreen extends StatefulWidget {
   final GameRepository repository;
-  const SearchScreen({super.key, required this.repository});
+  final Future<XFile?> Function(ImageSource)? pickPhoto;
+  final Future<List<String>> Function(String)? readPhoto;
+  final VoidCallback? onRecoveredPhoto;
+  const SearchScreen(
+      {super.key,
+      required this.repository,
+      this.pickPhoto,
+      this.readPhoto,
+      this.onRecoveredPhoto});
   @override
   State<SearchScreen> createState() => _SearchScreenState();
 }
@@ -30,34 +39,70 @@ class _SearchScreenState extends State<SearchScreen> {
   Set<String> _favorites = {};
   bool _readingPhoto = false;
 
-  Future<void> _photo(ImageSource source) async {
-    setState(() => _readingPhoto = true);
+  @override
+  void initState() {
+    super.initState();
+    if (Platform.isAndroid) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _restorePhoto());
+    }
+  }
+
+  Future<void> _restorePhoto() async {
     try {
-      final photo = await ImagePicker()
-          .pickImage(source: source, maxWidth: 1800, imageQuality: 90);
-      if (photo == null) return;
-      final lines = await OcrService.recognizeText(photo.path);
-      if (!mounted) return;
-      if (lines.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text(
-                'No se pudo leer el título. Prueba con una foto más clara.')));
-        return;
+      final lost = await ImagePicker().retrieveLostData();
+      if (!mounted || lost.isEmpty) return;
+      widget.onRecoveredPhoto?.call();
+      if (lost.files?.isNotEmpty == true) {
+        setState(() => _readingPhoto = true);
+        await _readPhoto(lost.files!.first);
+      } else if (lost.exception != null) {
+        await _confirmPhoto([],
+            error: OcrService.errorMessage(lost.exception!));
       }
-      final query = await showDialog<String>(
-          context: context, builder: (_) => _PhotoQueryDialog(lines: lines));
-      if (!mounted || query == null) return;
-      _controller.text = query;
-      _changed(query);
     } catch (_) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text(
-                'No se pudo leer la foto. Revisa los permisos de cámara o busca por texto.')));
-      }
+      // No pending selection is a normal state when the picker was not used.
     } finally {
       if (mounted) setState(() => _readingPhoto = false);
     }
+  }
+
+  Future<void> _photo(ImageSource source) async {
+    setState(() => _readingPhoto = true);
+    try {
+      final photo = widget.pickPhoto != null
+          ? await widget.pickPhoto!(source)
+          : await ImagePicker()
+              .pickImage(source: source, maxWidth: 3000, imageQuality: 100);
+      if (photo != null) await _readPhoto(photo);
+    } catch (error) {
+      await _confirmPhoto([], error: OcrService.errorMessage(error));
+    } finally {
+      if (mounted) setState(() => _readingPhoto = false);
+    }
+  }
+
+  Future<void> _readPhoto(XFile photo) async {
+    try {
+      final lines =
+          await (widget.readPhoto ?? OcrService.recognizeText)(photo.path);
+      await _confirmPhoto(lines,
+          error: lines.isEmpty
+              ? 'No se reconoció texto en la imagen. Escribe el título o prueba una foto donde se vea con claridad.'
+              : null);
+    } catch (error) {
+      await _confirmPhoto([], error: OcrService.errorMessage(error));
+    }
+  }
+
+  Future<void> _confirmPhoto(List<String> lines, {String? error}) async {
+    if (!mounted) return;
+    setState(() => _readingPhoto = false);
+    final query = await showDialog<String>(
+        context: context,
+        builder: (_) => _PhotoQueryDialog(lines: lines, error: error));
+    if (!mounted || query == null) return;
+    _controller.text = query;
+    await _search();
   }
 
   @override
@@ -233,13 +278,20 @@ class _SearchScreenState extends State<SearchScreen> {
 
 class _PhotoQueryDialog extends StatefulWidget {
   final List<String> lines;
-  const _PhotoQueryDialog({required this.lines});
+  final String? error;
+  const _PhotoQueryDialog({required this.lines, this.error});
   @override
   State<_PhotoQueryDialog> createState() => _PhotoQueryDialogState();
 }
 
 class _PhotoQueryDialogState extends State<_PhotoQueryDialog> {
   final _edit = TextEditingController();
+  @override
+  void initState() {
+    super.initState();
+    if (widget.lines.isNotEmpty) _edit.text = widget.lines.first;
+  }
+
   @override
   void dispose() {
     _edit.dispose();
@@ -251,7 +303,7 @@ class _PhotoQueryDialogState extends State<_PhotoQueryDialog> {
           title: const Text('Confirma el título'),
           content: SingleChildScrollView(
               child: Column(mainAxisSize: MainAxisSize.min, children: [
-            const Text(
+            Text(widget.error ??
                 'Selecciona el texto del juego; puedes corregirlo antes de buscar.'),
             Wrap(
                 spacing: 6,
