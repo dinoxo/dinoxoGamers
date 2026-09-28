@@ -1,14 +1,83 @@
 import 'dart:convert';
+import 'dart:isolate';
 import 'package:html/parser.dart' as html;
 import 'package:http/http.dart' as http;
 import '../../core/constants/app_constants.dart';
 import '../../domain/models/subscription_item.dart';
+import '../../domain/models/membership_benefits.dart';
+import 'membership_benefits_source.dart';
 import '../../domain/services/subscription_title.dart';
+
+enum _Parser {
+  playstation,
+  xbox,
+  nintendo,
+  genesis,
+  nextData,
+  announcements,
+  nintendoNews,
+  merge,
+  psBenefits,
+  xboxBenefits,
+  nintendoBenefits
+}
+
+// A callable data object avoids accidentally sending an HTTP client captured by
+// an instance-method closure to an isolate (Dart closures can share context).
+class _ParseTask<T> {
+  const _ParseTask(this.parser, this.now,
+      {this.body = '',
+      this.tier,
+      this.platform,
+      this.memberships,
+      this.url = '',
+      this.publication,
+      this.catalog = const [],
+      this.announcements = const []});
+  final _Parser parser;
+  final DateTime now;
+  final String body;
+  final SubscriptionTier? tier;
+  final GamePlatform? platform;
+  final Map<String, SubscriptionTier>? memberships;
+  final String url;
+  final DateTime? publication;
+  final List<SubscriptionItem> catalog;
+  final List<SubscriptionItem> announcements;
+  T call() => (switch (parser) {
+        _Parser.playstation =>
+          SubscriptionSource.parsePlaystation(body, tier!, now),
+        _Parser.xbox => SubscriptionSource.parseXbox(body, memberships!, now),
+        _Parser.nintendo => SubscriptionSource.parseNintendo(body, now),
+        _Parser.genesis => SubscriptionSource.parseGenesis(body, now),
+        _Parser.nextData => SubscriptionSource.nextData(body),
+        _Parser.announcements =>
+          SubscriptionSource.parseAnnouncements(body, platform!, now),
+        _Parser.nintendoNews =>
+          SubscriptionSource.parseNintendoNews(body, url, publication!, now),
+        _Parser.merge =>
+          SubscriptionSource.mergeAnnouncements(catalog, announcements, now),
+        _Parser.psBenefits =>
+          MembershipBenefitsSource.parsePlaystation(body, now),
+        _Parser.xboxBenefits => MembershipBenefitsSource.parseXbox(body, now),
+        _Parser.nintendoBenefits =>
+          MembershipBenefitsSource.parseNintendo(body, tier!, now),
+      }) as T;
+}
 
 /// Public content used by the official US storefronts. No account or paid key.
 class SubscriptionSource {
-  SubscriptionSource({http.Client? client}) : _client = client ?? http.Client();
+  SubscriptionSource({http.Client? client})
+      : _client = client ?? http.Client(),
+        _backgroundParsing = client == null;
   final http.Client _client;
+  final bool _backgroundParsing;
+  final Map<GamePlatform, List<String>> _notices = {};
+  void close() => _client.close();
+
+  // HTTP remains asynchronous; large DOM/JSON work must not stall Flutter frames.
+  Future<T> _parse<T>(_ParseTask<T> task) =>
+      _backgroundParsing ? Isolate.run(task.call) : Future.sync(task.call);
   static const psPage = 'https://www.playstation.com/en-us/ps-plus/games/';
   static const xboxPage = 'https://www.xbox.com/en-US/xbox-game-pass/games';
   static const nintendoPage =
@@ -27,6 +96,7 @@ class SubscriptionSource {
 
   Future<List<SubscriptionItem>> fetch(
       GamePlatform platform, DateTime now) async {
+    _notices[platform] = [];
     switch (platform) {
       case GamePlatform.playstation:
         return _playstation(now);
@@ -34,6 +104,69 @@ class SubscriptionSource {
         return _xbox(now);
       case GamePlatform.nintendo:
         return _nintendo(now);
+    }
+  }
+
+  Future<SubscriptionCatalog> fetchCatalog(
+      GamePlatform platform, DateTime now) async {
+    final games = fetch(platform, now);
+    final benefits = _fetchBenefits(platform, now)
+        .catchError((Object _) => <MembershipBenefits>[]);
+    final items = await games;
+    final plans = await benefits;
+    return SubscriptionCatalog(items: items, benefits: plans, notices: [
+      ...?_notices[platform],
+      if (plans.isEmpty)
+        'No se pudieron comprobar los beneficios. Consulta la página oficial del plan.',
+      if (platform == GamePlatform.playstation)
+        'Sony publica «Última oportunidad para jugar» en la consola. Si una retirada no está fechada en su blog, la app no puede confirmar su fecha desde la web.',
+    ]);
+  }
+
+  Future<List<MembershipBenefits>> _fetchBenefits(
+      GamePlatform platform, DateTime now) async {
+    if (platform == GamePlatform.nintendo) {
+      final results = await Future.wait({
+        SubscriptionTier.nsoStandard: MembershipBenefitsSource.nintendoUrl,
+        SubscriptionTier.nsoExpansion: MembershipBenefitsSource.expansionUrl
+      }.entries.map((plan) async {
+        try {
+          final parsed = await _parse(_ParseTask<List<MembershipBenefits>>(
+              _Parser.nintendoBenefits, now,
+              body: await _get(plan.value), tier: plan.key));
+          if (parsed.isEmpty) throw StateError('Plan structure changed');
+          return parsed;
+        } catch (_) {
+          (_notices[platform] ??= []).add(
+              'No se pudieron comprobar los beneficios de ${plan.key.displayName}. Consulta su página oficial.');
+          return <MembershipBenefits>[];
+        }
+      }));
+      return results.expand((p) => p).toList();
+    }
+    final url = platform == GamePlatform.playstation
+        ? MembershipBenefitsSource.playstationUrl
+        : MembershipBenefitsSource.xboxUrl;
+    final body = await _get(url);
+    return _parse(_ParseTask<List<MembershipBenefits>>(
+        platform == GamePlatform.playstation
+            ? _Parser.psBenefits
+            : _Parser.xboxBenefits,
+        now,
+        body: body));
+  }
+
+  Future<List<SubscriptionItem>> _announcements(
+      String url, GamePlatform platform, DateTime now) async {
+    try {
+      final feed = await _get(url);
+      return await _parse(_ParseTask<List<SubscriptionItem>>(
+          _Parser.announcements, now,
+          body: feed, platform: platform));
+    } catch (_) {
+      (_notices[platform] ??= []).add(
+          'El catálogo se verificó, pero no se pudieron consultar los anuncios de altas y retiradas. Reintenta para comprobar las fechas.');
+      return [];
     }
   }
 
@@ -47,15 +180,19 @@ class SubscriptionSource {
     final lists = await Future.wait(kinds.entries.map((kind) async {
       final url =
           'https://www.playstation.com/bin/imagic/gameslist?locale=en-us&categoryList=${kind.key}';
-      return parsePlaystation(await _get(url), kind.value, now);
+      final body = await _get(url);
+      final tier = kind.value;
+      return _parse(_ParseTask<List<SubscriptionItem>>(_Parser.playstation, now,
+          body: body, tier: tier));
     }));
     final catalog = lists.expand((items) => items).toList();
     if (catalog.isEmpty) throw StateError('Empty official PS catalog');
-    final announcements = parseAnnouncements(
-        await _get('https://blog.playstation.com/category/ps-plus/feed/'),
+    final announcements = await _announcements(
+        'https://blog.playstation.com/category/ps-plus/feed/',
         GamePlatform.playstation,
         now);
-    return mergeAnnouncements(catalog, announcements, now);
+    return _parse(_ParseTask<List<SubscriptionItem>>(_Parser.merge, now,
+        catalog: catalog, announcements: announcements));
   }
 
   static List<SubscriptionItem> parsePlaystation(
@@ -134,17 +271,19 @@ class SubscriptionSource {
             'displaycatalog.mp.microsoft.com',
             '/v7.0/products',
             {'bigIds': batch, 'market': 'US', 'languages': 'en-us'});
-        chunks.add(_get(uri.toString())
-            .then((body) => parseXbox(body, memberships, now)));
+        chunks.add(_get(uri.toString()).then((body) => _parse(
+            _ParseTask<List<SubscriptionItem>>(_Parser.xbox, now,
+                body: body, memberships: memberships))));
       }
       catalog.addAll((await Future.wait(chunks)).expand((items) => items));
     }
     if (catalog.isEmpty) throw StateError('Xbox titles not returned');
-    final announcements = parseAnnouncements(
-        await _get('https://news.xbox.com/en-us/tag/xbox-game-pass/feed/'),
+    final announcements = await _announcements(
+        'https://news.xbox.com/en-us/tag/xbox-game-pass/feed/',
         GamePlatform.xbox,
         now);
-    return mergeAnnouncements(catalog, announcements, now);
+    return _parse(_ParseTask<List<SubscriptionItem>>(_Parser.merge, now,
+        catalog: catalog, announcements: announcements));
   }
 
   static List<SubscriptionItem> parseXbox(
@@ -194,30 +333,51 @@ class SubscriptionSource {
   }
 
   Future<List<SubscriptionItem>> _nintendo(DateTime now) async {
-    final catalog = parseNintendo(await _get(nintendoPage), now);
-    catalog.addAll(parseGenesis(await _get(genesisPage), now));
-    if (catalog.isEmpty) throw StateError('Nintendo catalog not returned');
-    final newsBody = await _get('https://www.nintendo.com/us/whatsnew/');
-    final data = nextData(newsBody);
-    final state =
-        data['props']?['pageProps']?['initialApolloState'] as Map? ?? {};
-    final candidates = state.values.whereType<Map>().where((article) =>
-        RegExp(r'(new update.*nintendo switch online|nintendo classics.*(?:update|added|available|coming|arriv)|games.*(?:added|coming).*nintendo switch online)',
-                caseSensitive: false)
-            .hasMatch(article['title'] as String? ?? '') &&
-        DateTime.tryParse(article['publishDate'] as String? ?? '')
-                ?.isAfter(DateTime(now.year, now.month - 1)) ==
-            true);
-    final announcements = <SubscriptionItem>[];
-    for (final article in candidates.take(6)) {
-      final url = 'https://www.nintendo.com/us/whatsnew/${article['slug']}/';
-      final body = await _get(url);
-      final date = DateTime.tryParse(article['publishDate'] as String? ?? '');
-      if (date != null) {
-        announcements.addAll(parseNintendoNews(body, url, date, now));
-      }
+    final body = await _get(nintendoPage);
+    final catalog = await _parse(
+        _ParseTask<List<SubscriptionItem>>(_Parser.nintendo, now, body: body));
+    try {
+      final genesis = await _get(genesisPage);
+      catalog.addAll(await _parse(_ParseTask<List<SubscriptionItem>>(
+          _Parser.genesis, now,
+          body: genesis)));
+    } catch (_) {
+      (_notices[GamePlatform.nintendo] ??= []).add(
+          'No se pudo comprobar la lista de SEGA Genesis; las demás consolas se muestran verificadas.');
     }
-    return mergeAnnouncements(catalog, announcements, now);
+    if (catalog.isEmpty) throw StateError('Nintendo catalog not returned');
+    try {
+      final newsBody = await _get('https://www.nintendo.com/us/whatsnew/');
+      final data = await _parse(_ParseTask<Map<String, dynamic>>(
+          _Parser.nextData, now,
+          body: newsBody));
+      final state =
+          data['props']?['pageProps']?['initialApolloState'] as Map? ?? {};
+      final candidates = state.values.whereType<Map>().where((article) =>
+          RegExp(r'(new update.*nintendo switch online|nintendo classics.*(?:update|added|available|coming|arriv)|games.*(?:added|coming).*nintendo switch online)',
+                  caseSensitive: false)
+              .hasMatch(article['title'] as String? ?? '') &&
+          DateTime.tryParse(article['publishDate'] as String? ?? '')
+                  ?.isAfter(DateTime(now.year, now.month - 1)) ==
+              true);
+      final announcements = <SubscriptionItem>[];
+      for (final article in candidates.take(6)) {
+        final url = 'https://www.nintendo.com/us/whatsnew/${article['slug']}/';
+        final body = await _get(url);
+        final date = DateTime.tryParse(article['publishDate'] as String? ?? '');
+        if (date != null) {
+          announcements.addAll(await _parse(_ParseTask<List<SubscriptionItem>>(
+              _Parser.nintendoNews, now,
+              body: body, url: url, publication: date)));
+        }
+      }
+      return _parse(_ParseTask<List<SubscriptionItem>>(_Parser.merge, now,
+          catalog: catalog, announcements: announcements));
+    } catch (_) {
+      (_notices[GamePlatform.nintendo] ??= []).add(
+          'No se pudieron comprobar las últimas noticias de Nintendo: las altas y retiradas pueden estar incompletas.');
+      return catalog;
+    }
   }
 
   static List<SubscriptionItem> parseNintendoNews(
@@ -371,6 +531,23 @@ class SubscriptionSource {
       DateTime now) {
     final result = [...catalog];
     for (final announcement in announcements) {
+      if (announcement.status == SubscriptionStatus.leavingSoon) {
+        final key = subscriptionTitleKey(announcement.title);
+        var found = false;
+        for (var index = 0; index < result.length; index++) {
+          final item = result[index];
+          if (item.platform == announcement.platform &&
+              subscriptionTitleKey(item.title) == key &&
+              item.availableAt(now)) {
+            result[index] = item.withAnnouncement(announcement);
+            found = true;
+          }
+        }
+        if (!found && announcement.availableUntil?.isAfter(now) == true) {
+          result.add(announcement);
+        }
+        continue;
+      }
       final start = announcement.addedAt;
       if (start == null) continue;
       if (start.isAfter(now)) {
@@ -433,8 +610,18 @@ class SubscriptionSource {
 
   static List<SubscriptionItem> parseAnnouncements(
       String feed, GamePlatform platform, DateTime now) {
+    final channel =
+        RegExp(r'<rss\b[^>]*>\s*<channel\b[^>]*>([\s\S]*?)</channel>\s*</rss>')
+            .firstMatch(feed);
+    if (channel == null) throw StateError('Announcement feed unavailable');
+    final rssItems =
+        RegExp(r'<item>([\s\S]*?)</item>').allMatches(channel[1]!).toList();
+    if (RegExp(r'<item\b').allMatches(channel[1]!).length != rssItems.length ||
+        RegExp(r'</item>').allMatches(channel[1]!).length != rssItems.length) {
+      throw StateError('Announcement feed incomplete');
+    }
     final items = <SubscriptionItem>[];
-    for (final rss in RegExp(r'<item>([\s\S]*?)</item>').allMatches(feed)) {
+    for (final rss in rssItems) {
       final xml = rss[1]!;
       String tag(String name) =>
           RegExp('<$name>([\\s\\S]*?)</$name>').firstMatch(xml)?[1] ?? '';
@@ -444,15 +631,21 @@ class SubscriptionSource {
                   .replaceAll(']]>', ''))
               .text ??
           '';
+      if (title.isEmpty || tag('link').trim().isEmpty) {
+        throw StateError('Announcement identity unavailable');
+      }
       final valid = platform == GamePlatform.playstation
           ? title.startsWith('PlayStation Plus Monthly Games') ||
-              title.startsWith('PlayStation Plus Game Catalog')
+              title.startsWith('PlayStation Plus Game Catalog') ||
+              RegExp(r'^PlayStation Plus.*(?:leaving|last chance)',
+                      caseSensitive: false)
+                  .hasMatch(title)
           : RegExp(r'^Coming to Xbox Game Pass', caseSensitive: false)
               .hasMatch(title);
       if (!valid) continue;
       final url = tag('link');
       final dateMatch = RegExp(r'/(20\d{2})/(\d{2})/(\d{2})/').firstMatch(url);
-      if (dateMatch == null) continue;
+      if (dateMatch == null) throw StateError('Announcement date unavailable');
       final year = int.parse(dateMatch[1]!);
       final publication =
           DateTime(year, int.parse(dateMatch[2]!), int.parse(dateMatch[3]!));
@@ -461,7 +654,64 @@ class SubscriptionSource {
           RegExp(r'<content:encoded><!\[CDATA\[([\s\S]*?)\]\]></content:encoded>')
                   .firstMatch(xml)?[1] ??
               '';
+      if (body.trim().isEmpty) {
+        throw StateError('Announcement article unavailable');
+      }
       final document = html.parse(body);
+      // Departures are explicitly dated sections, not activation dates. A
+      // console catalog entry supplies its verified tier and artwork on merge.
+      for (final heading in document.querySelectorAll('h2,h3')) {
+        if (!RegExp(r'\b(leaving|last chance)\b', caseSensitive: false)
+            .hasMatch(heading.text)) {
+          continue;
+        }
+        var end = _date(heading.text, year);
+        if (end == null) continue;
+        if (publication.month == 12 && end.month == 1 && end.year == year) {
+          end = DateTime(year + 1, 1, end.day);
+        }
+        final until = end.add(const Duration(days: 1));
+        for (var section = heading.nextElementSibling;
+            section != null;
+            section = section.nextElementSibling) {
+          if (['h2', 'h3'].contains(section.localName)) break;
+          if (section.localName != 'ul') continue;
+          for (final entry in section.querySelectorAll('li')) {
+            final text = entry.text.trim();
+            final match = RegExp(r'^(.+?)\s*\(([^)]+)\)\s*$').firstMatch(text);
+            if (platform == GamePlatform.xbox &&
+                (match == null ||
+                    !RegExp(r'console|xbox', caseSensitive: false)
+                        .hasMatch(match[2]!))) {
+              continue;
+            }
+            final gameTitle = match?[1]?.trim() ?? text.split('|').first.trim();
+            if (gameTitle.isEmpty) continue;
+            items.add(SubscriptionItem(
+              id: 'leaving_${platform.name}_${subscriptionTitleKey(gameTitle)}_${until.toIso8601String()}',
+              title: gameTitle,
+              platform: platform,
+              tier: platform == GamePlatform.xbox
+                  ? SubscriptionTier.xboxUltimate
+                  : SubscriptionTier.psExtra,
+              status: SubscriptionStatus.leavingSoon,
+              category: SubscriptionCategory.leavingSoon,
+              coverUrl: '',
+              consoles: platform == GamePlatform.xbox
+                  ? ['Xbox (consola)']
+                  : ['PlayStation'],
+              sourceUrl: url,
+              officialStoreUrl: url,
+              checkedAt: now,
+              availableUntil: until,
+              availabilityConfirmed: false,
+              expiryDate: end.toIso8601String().split('T').first,
+              statusNote:
+                  'Retirada anunciada oficialmente; el nivel se confirma con el catálogo actual.',
+            ));
+          }
+        }
+      }
       final intro = document.body!.text;
       final isMonthly = title.startsWith('PlayStation Plus Monthly Games');
       final firstGame =
@@ -487,13 +737,22 @@ class SubscriptionSource {
       }
       var tier =
           isMonthly ? SubscriptionTier.psEssential : SubscriptionTier.psExtra;
-      String? image;
-      for (final element in document.querySelectorAll('h2,h3,p,strong,img')) {
-        if (element.localName == 'img') {
-          image = element.attributes['src'];
-          continue;
-        }
+      var xboxAdditionSection = false;
+      var departureSection = false;
+      for (final element in document.querySelectorAll('h2,h3,p,strong')) {
         final text = element.text.trim();
+        if (element.localName == 'h2' || element.localName == 'h3') {
+          departureSection =
+              RegExp(r'\b(leaving|last chance)\b', caseSensitive: false)
+                  .hasMatch(text);
+          if (platform == GamePlatform.xbox) {
+            xboxAdditionSection = RegExp(
+                    r'^(available today|coming soon)(\b|$)',
+                    caseSensitive: false)
+                .hasMatch(text);
+          }
+        }
+        if (departureSection) continue;
         if (platform == GamePlatform.playstation &&
             text.contains('Premium') &&
             text.contains('Classics')) {
@@ -518,7 +777,7 @@ class SubscriptionSource {
               .toList();
           start = psStart;
         } else {
-          if (element.localName != 'strong') continue;
+          if (!xboxAdditionSection || element.localName != 'strong') continue;
           final match =
               RegExp(r'^(.+?)\s*\(([^)]+)\)\s*[–—-]\s*(.+)$').firstMatch(text);
           if (match == null ||
@@ -527,6 +786,11 @@ class SubscriptionSource {
             continue;
           }
           gameTitle = match[1]!.trim();
+          if (RegExp(r'\b(trial|demo|early access trial|beta|free play days)\b',
+                  caseSensitive: false)
+              .hasMatch(gameTitle)) {
+            continue;
+          }
           consoles = [match[2]!];
           start = _date(match[3]!, year);
           if (start != null &&
@@ -547,6 +811,13 @@ class SubscriptionSource {
                   : SubscriptionTier.xboxUltimate;
         }
         if (start == null) continue;
+        final image = document
+            .querySelectorAll('img')
+            .where((img) =>
+                subscriptionTitleKey(img.attributes['alt'] ?? '') ==
+                subscriptionTitleKey(gameTitle))
+            .firstOrNull
+            ?.attributes['src'];
         items.add(SubscriptionItem(
           id: 'announcement_${platform.name}_${subscriptionTitleKey(gameTitle)}_${start.toIso8601String()}',
           title: gameTitle,

@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../../../domain/services/subscription_title.dart';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -83,9 +84,13 @@ class _SearchScreenState extends State<SearchScreen> {
 
   Future<void> _readPhoto(XFile photo) async {
     try {
-      final lines =
-          await (widget.readPhoto ?? OcrService.recognizeText)(photo.path);
+      final recognition = widget.readPhoto == null
+          ? await OcrService.recognizePhoto(photo.path)
+          : PhotoRecognition(await widget.readPhoto!(photo.path)
+              .timeout(const Duration(seconds: 20)));
+      final lines = recognition.candidates;
       await _confirmPhoto(lines,
+          platform: recognition.platform,
           error: lines.isEmpty
               ? 'No se reconoció texto en la imagen. Escribe el título o prueba una foto donde se vea con claridad.'
               : null);
@@ -94,7 +99,8 @@ class _SearchScreenState extends State<SearchScreen> {
     }
   }
 
-  Future<void> _confirmPhoto(List<String> lines, {String? error}) async {
+  Future<void> _confirmPhoto(List<String> lines,
+      {String? error, GamePlatform? platform}) async {
     if (!mounted) return;
     setState(() => _readingPhoto = false);
     final query = await showDialog<String>(
@@ -102,7 +108,8 @@ class _SearchScreenState extends State<SearchScreen> {
         builder: (_) => _PhotoQueryDialog(lines: lines, error: error));
     if (!mounted || query == null) return;
     _controller.text = query;
-    await _search();
+    setState(() => _platform = platform);
+    await _search(openPhotoMatch: true);
   }
 
   @override
@@ -128,7 +135,7 @@ class _SearchScreenState extends State<SearchScreen> {
     }
   }
 
-  Future<void> _search({bool more = false}) async {
+  Future<void> _search({bool more = false, bool openPhotoMatch = false}) async {
     _debounce?.cancel();
     final query = _controller.text.trim();
     if (query.length < 2) return;
@@ -156,6 +163,19 @@ class _SearchScreenState extends State<SearchScreen> {
         _hasMore = result.hasMore;
         _warning = result.warnings.isEmpty ? null : result.warnings.join('\n');
       });
+      if (openPhotoMatch) {
+        final matches = result.games
+            .where((game) =>
+                subscriptionTitleKey(game.title) == subscriptionTitleKey(query))
+            .toList();
+        if (matches.length == 1 && !result.hasMore && result.warnings.isEmpty) {
+          unawaited(Navigator.push(
+              context,
+              MaterialPageRoute<void>(
+                  builder: (_) => GameDetailsScreen(
+                      game: matches.single, repository: widget.repository))));
+        }
+      }
     } catch (e) {
       if (!mounted || generation != _generation) return;
       setState(() => _error = e is CatalogException

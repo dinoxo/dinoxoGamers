@@ -2,6 +2,24 @@
 
 Todas las modificaciones notables de este proyecto se documentan en este archivo.
 
+## [1.5.0+6] - 2026-09-28
+
+### Corregido
+- Portadas y reseñas vinculadas al título de la ficha: se rechazan ofertas relacionadas y respuestas sin identidad comprobable. Actualizar una ficha antigua no permite sustituirla por otro juego de la misma compañía.
+- Las imágenes y reseñas guardadas con el método anterior se ocultan hasta verificar su fuente; se conservan favoritos, alertas e historial.
+- Galería sin imágenes de relleno: coincidencia exacta de título y edición en Steam, procedencia visible y enlaces de vídeo etiquetados como búsquedas.
+- Inicio y Plus: análisis de HTML/JSON en un hilo separado, índice de títulos, construcción de tarjetas visibles y carga de pestañas bajo demanda. Notificaciones y consultas externas comienzan después de mostrar la primera pantalla.
+- Plus: próximos ingresos, mes siguiente, retiradas con fecha publicada y beneficios por plan de las tres compañías, exclusivamente USA. Nintendo separa DLC y mejoras del juego base; Xbox excluye actualizaciones, pruebas y beneficios de las altas de juegos completos.
+- Una fuente de anuncios ilegible muestra un aviso y conserva los juegos actuales. El fallo de una página de beneficios Nintendo conserva el otro plan verificado. Las retiradas PlayStation sin fecha pública confirmada no se inventan.
+- Cámara y galería: lectura de imagen fuera del hilo principal Android, títulos repartidos entre líneas, pista de consola y límite de tiempo. La ficha automática requiere una coincidencia exacta única y una consulta completa; los errores parciales y las distintas ediciones quedan visibles para elegir.
+
+### Alcance
+- Empaquetado en APK Release único universal `DinoxoGamers-V1.5.apk`, versión `1.5.0+6`.
+
+### Verificación
+- 96 pruebas aprobadas y análisis Flutter sin incidencias. Comprobación Kotlin y compilación APK Release exitosa.
+- Consultas reales con los servicios de la app: catálogos y beneficios de las tres compañías, portadas distintas para Ghost y Zelda, próximas incorporaciones y retiradas Xbox fechadas. Revisión independiente y pruebas de errores parciales.
+
 ## [1.4.0+5] - 2026-09-28
 
 ### Corregido

@@ -27,6 +27,8 @@ class MainShell extends StatefulWidget {
 
 class _MainShellState extends State<MainShell> {
   int _currentIndex = 0;
+  // Search stays mounted to recover a photo after Android recreates the activity.
+  final Set<int> _visited = {0, 1};
   late final List<Widget> _screens;
 
   @override
@@ -37,7 +39,12 @@ class _MainShellState extends State<MainShell> {
       SearchScreen(
           repository: widget.repository,
           onRecoveredPhoto: () {
-            if (mounted) setState(() => _currentIndex = 1);
+            if (mounted) {
+              setState(() {
+                _visited.add(1);
+                _currentIndex = 1;
+              });
+            }
           }),
       const PlusScreen(autoLoad: false),
       AlertsScreen(repository: widget.repository),
@@ -361,13 +368,19 @@ class _MainShellState extends State<MainShell> {
       ),
       body: IndexedStack(
         index: _currentIndex,
-        children: _screens,
+        children: [
+          for (var i = 0; i < _screens.length; i++)
+            _visited.contains(i) ? _screens[i] : const SizedBox.shrink()
+        ],
       ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
         type: BottomNavigationBarType.fixed,
         onTap: (index) {
-          setState(() => _currentIndex = index);
+          setState(() {
+            _visited.add(index);
+            _currentIndex = index;
+          });
           if (index == 2) SubscriptionService.instance.ensureLoaded();
         },
         items: const [

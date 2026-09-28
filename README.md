@@ -8,7 +8,7 @@ App Flutter para Android, gratuita y sin activación de licencias. Consulta jueg
 
 - Buscar consulta la web al escribir un título; no filtra un catálogo fijo. Incluye paginación y selección de marca.
 - Ofertas consulta caídas de precio y muestra únicamente descuentos digitales publicados para la tienda oficial de cada marca en USA.
-- Cada ficha valida la moneda, el formato digital, la plataforma y el dominio/región del enlace oficial. Los importes publicados en centavos se convierten a USD.
+- Cada ficha valida el título de la página, la moneda, el formato digital, la plataforma y el dominio/región del enlace oficial. Los importes publicados en centavos se convierten a USD. Las ofertas relacionadas no heredan la portada ni la reseña del producto principal.
 - Una ficha sin precio permanece sin precio. No se crean juegos, rebajas, fechas ni valoraciones como alternativa a una consulta fallida.
 - La app muestra la fuente y cuándo hizo la consulta. Deku Deals es un agregador: sus datos pueden tener demora respecto de la tienda. El importe final se confirma en el comercio.
 - Errores HTTP, problemas de conexión y fichas parcialmente disponibles son estados visibles. No se evita el bloqueo de una fuente.
@@ -21,6 +21,8 @@ Al abrir una ficha se vuelven a consultar sus datos. Las puntuaciones de Metacri
 
 SQLite conserva las fichas consultadas, favoritos, biblioteca y observaciones reales de precio. La gráfica comienza con lo observado en este teléfono, no con una curva ficticia del pasado. No se declara un mínimo histórico absoluto basándose únicamente en el precio actual. El estimador requiere al menos tres ciclos de rebajas observados y presenta una estimación, no una fecha garantizada.
 
+La galería solo acepta capturas de Steam cuando el nombre de búsqueda y el detalle coinciden exactamente con el título y edición. Se identifica su procedencia de PC. Si no hay imágenes verificadas, muestra ese estado; no usa imágenes de otros juegos como relleno. Los enlaces de YouTube se presentan como búsquedas de tráiler o reseñas. Las portadas y reseñas de fichas guardadas con el método anterior se ocultan hasta consultar otra vez su fuente, conservando favoritos, alertas y precios observados.
+
 Las fechas de fin de oferta se muestran tal como las publica la fuente cuando están disponibles. No se deduce una fecha absoluta a partir de un texto que no especifica año o zona horaria.
 
 ## Inicio, fotos y alertas
@@ -28,6 +30,10 @@ Las fechas de fin de oferta se muestran tal como las publica la fuente cuando es
 El icono de instalación usa el medallón circular de dinoxo.Store, completo y con transparencia exterior. Al iniciar una sesión nueva, una presentación de 2,6 segundos muestra primero el logo y luego «dinoxo.Store». La app carga sus datos durante la presentación. Esta no se repite al volver de minimizar y se descarta si se minimiza mientras se reproduce. Con movimiento reducido habilitado, muestra una entrada breve sin los efectos de escala o desplazamiento.
 
 La cámara y galería usan el selector de imágenes de Android. El permiso de cámara se solicita al usarla; el selector de fotos de Android 13 o posterior no requiere acceso a toda la galería. Un puente Android invoca **ML Kit Text Recognition** con el modelo latino incluido (`com.google.mlkit:text-recognition:16.0.1`), admite rutas locales y URI y lee el texto en el teléfono. Combina títulos repartidos entre líneas y descarta texto habitual del embalaje. El usuario confirma o corrige el título y se ejecuta la búsqueda web. Si no se lee texto, se puede escribir el título; un permiso denegado tiene su propio mensaje. Se recupera la selección cuando Android interrumpe la actividad durante el selector. No se envía la foto a un servidor de reconocimiento. Android mínimo: el mayor entre 23 y el mínimo de Flutter.
+
+La decodificación de la foto y el inicio de reconocimiento trabajan fuera del hilo principal de Android. La lectura tiene un límite de 20 segundos y usa pistas de consola encontradas en el embalaje. La ficha se abre automáticamente solo si la consulta terminó sin errores ni páginas pendientes y existe una sola coincidencia exacta. Con varias ediciones o información parcial, se mantienen los resultados para que el usuario elija.
+
+La primera pantalla se muestra antes de inicializar notificaciones y cargas externas. El análisis pesado de HTML/JSON se ejecuta fuera del hilo de Flutter, las coincidencias de membresías usan un índice y Plus construye únicamente las tarjetas visibles. Las pestañas conservan su estado después de visitarlas; Buscar se mantiene disponible para recuperar fotos interrumpidas por Android.
 
 Las alertas permiten escribir un importe exacto en USD con hasta dos decimales y lo guardan en SQLite para la edición elegida. Mis Alertas se actualiza al guardar, permite activar/desactivar y tiene actualización manual. Se compara el precio real consultado con el objetivo en centavos: se avisa si es igual o inferior. El permiso denegado conserva la alerta y explica cómo habilitarlo.
 
@@ -37,7 +43,9 @@ WorkManager revisa las alertas activas en segundo plano con conexión a internet
 
 Plus consulta los catálogos públicos oficiales de PlayStation Plus, Xbox Game Pass para consola y Nintendo Switch Online de Estados Unidos. Combina las listas actuales con anuncios oficiales de altas y sus fechas; Nintendo incluye también el catálogo de SEGA Genesis. No necesita cuentas ni claves de pago.
 
-Los filtros separan los juegos disponibles ahora, las altas del mes en curso y los anuncios fechados para el mes siguiente. Si todavía no hay anuncios, se indica sin inventar juegos ni fechas. Se muestra el nivel requerido, consola, fuente y momento de la consulta. Un error al verificar una compañía aparece en pantalla y retira sus coincidencias anteriores. El catálogo se vuelve a consultar al abrir Plus o actualizarlo; se reutiliza durante 30 minutos.
+Los filtros separan los juegos disponibles ahora, las altas del mes en curso, los próximos ingresos, los anuncios fechados para el mes siguiente, las retiradas y los beneficios. Los beneficios se leen por plan desde las páginas oficiales USA; los DLC y las mejoras de Nintendo indican que requieren el juego base. Los anuncios Xbox de actualizaciones, pruebas y beneficios dentro de juegos no se consideran altas de juegos completos.
+
+Si todavía no hay anuncios, se indica sin inventar juegos ni fechas. Un feed ilegible se distingue de un feed sin anuncios y conserva el catálogo actual con un aviso. Se muestra el nivel requerido, consola, fuente y momento de la consulta. Un error al verificar una compañía aparece en pantalla y retira sus coincidencias anteriores. El catálogo se vuelve a consultar al abrir Plus o actualizarlo; se reutiliza durante 30 minutos. Para PlayStation, una retirada sin fecha pública confirmada en las fuentes consultadas se declara no comprobable; se recuerda revisar «Última oportunidad para jugar» en la consola.
 
 Ofertas, Buscar y las fichas comparten este catálogo y sugieren revisar la membresía antes de comprar. La coincidencia exige el mismo título y marca, conserva números de secuela, ediciones y complementos y descarta verificaciones de más de 24 horas. Los originales emulados de Nintendo no se usan para afirmar que un remake vendido para Switch está incluido. La app no conoce la suscripción del usuario ni los juegos mensuales que haya reclamado antes.
 
@@ -65,6 +73,8 @@ Prueba de consultas reales utilizando el mismo servicio Dart de la app:
 ```sh
 dart run tool/live_client_probe.dart
 dart run tool/live_subscription_probe.dart
+dart run tool/subscription_responsiveness_probe.dart final
+dart run tool/game_artwork_probe.dart
 ```
 
 También se pueden obtener respuestas actuales y comprobar el parser contra ellas:
@@ -80,4 +90,4 @@ Las respuestas de comprobación se guardan en `build/live-probe` y `build/subscr
 
 Desde `android`, `bash gradlew :app:compileDebugKotlin` verifica código Android sin empaquetar un APK. Cámara y notificaciones necesitan además una prueba posterior en un dispositivo Android.
 
-No se ha generado un APK en esta revisión. La versión del proyecto se conserva en `1.3.0+4`.
+No se ha generado un APK en esta revisión. La versión del proyecto se conserva en `1.4.0+5`.

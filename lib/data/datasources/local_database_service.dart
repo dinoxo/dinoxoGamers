@@ -91,6 +91,7 @@ class LocalDatabaseService {
             'key': 'catalog_v1:${game.id}',
             'value': jsonEncode({
               ...game.toMap(),
+              'artworkIdentityVersion': 2,
               'editions': game.editions.map((e) => e.toMap()).toList()
             })
           },
@@ -133,6 +134,12 @@ class LocalDatabaseService {
     for (final row in rows) {
       try {
         final m = jsonDecode(row['value'] as String) as Map<String, dynamic>;
+        // Earlier parsers could attach another product's artwork/review.
+        // Keep IDs, favorites, alerts and price history while awaiting a live refresh.
+        if (m['artworkIdentityVersion'] != 2) {
+          m['coverUrl'] = '';
+          m['review'] = null;
+        }
         games.add(Game.fromMap(m,
             editions: (m['editions'] as List)
                 .map((e) =>

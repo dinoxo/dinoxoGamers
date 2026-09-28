@@ -11,7 +11,8 @@ String offerHtml(
     num price = 1999,
     num discount = 4000,
     String url = 'https://store.playstation.com/en-us/product/EXAMPLE',
-    bool available = true}) {
+    bool available = true,
+    bool includeTitle = true}) {
   final data = jsonEncode({
     'currency': currency,
     'items': [
@@ -25,7 +26,7 @@ String offerHtml(
       }
     ]
   });
-  return '''<script>outAnalytics['$key'] = $data
+  return '''${includeTitle ? '<h1>$title</h1>' : ''}<script>outAnalytics['$key'] = $data
   </script><table><tr><td><a data-out-analytics-id="$key" href="$url">Store</a></td>
   <td>${available ? '\$${(price / 100).toStringAsFixed(2)}' : 'Unavailable'}</td>
   <td><a data-out-analytics-id="$key" href="$url">Sale ends October 8</a></td></tr></table>''';
