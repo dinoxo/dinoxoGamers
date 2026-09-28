@@ -452,11 +452,11 @@ class SubscriptionSource {
 
   static List<SubscriptionItem> parseNintendoNews(
       String body, String url, DateTime publication, DateTime now) {
-    final doc = html.parse(body);
-    final main = doc.querySelector('main') ?? doc.body!;
-    // Nintendo places a generic "News" heading before the article title.
-    final title = main.querySelectorAll('h1').map((h) => h.text).join(' ');
-    final text = main.text;
+    final mainMatch = RegExp(r'<main[^>]*>([\s\S]*?)</main>').firstMatch(body);
+    final content = mainMatch != null ? mainMatch[1]! : body;
+    final titleMatches = RegExp(r'<h1[^>]*>([\s\S]*?)</h1>').allMatches(content);
+    final title = titleMatches.map((h) => h[1]!.replaceAll(RegExp(r'<[^>]*>'), '').trim()).join(' ');
+    final text = content.replaceAll(RegExp(r'<[^>]*>'), ' ').replaceAll(RegExp(r'\s+'), ' ');
     final explicit = RegExp(
             '(?:available|arriv(?:e|ing|es)|added)[^.]{0,80}(?:${_months.join('|')})\\s+\\d{1,2}',
             caseSensitive: false)
@@ -477,9 +477,11 @@ class SubscriptionSource {
     }
     final result = <SubscriptionItem>[];
     String? console;
-    for (final heading in main.querySelectorAll('h2,h3')) {
-      final gameTitle = heading.text.trim();
-      if (heading.localName == 'h2') {
+    final headingMatches = RegExp(r'<(h[23])[^>]*>([\s\S]*?)</\1>').allMatches(content);
+    for (final heading in headingMatches) {
+      final tag = heading[1]!.toLowerCase();
+      final gameTitle = heading[2]!.replaceAll(RegExp(r'<[^>]*>'), '').trim().replaceAll('&#x27;', "'").replaceAll('&quot;', '"');
+      if (tag == 'h2') {
         console = gameTitle.contains('Super Nintendo') ||
                 gameTitle.contains('Super NES')
             ? 'Super NES'
@@ -522,23 +524,19 @@ class SubscriptionSource {
   }
 
   static Map<String, dynamic> nextData(String body) {
-    final script = html.parse(body).querySelector('script#__NEXT_DATA__');
-    if (script == null) throw StateError('Official page data unavailable');
-    return jsonDecode(script.text) as Map<String, dynamic>;
+    final match = RegExp(r'<script[^>]*id="__NEXT_DATA__"[^>]*>([\s\S]*?)</script>').firstMatch(body);
+    if (match == null) throw StateError('Official page data unavailable');
+    return jsonDecode(match[1]!) as Map<String, dynamic>;
   }
 
   static List<SubscriptionItem> parseGenesis(String body, DateTime now) {
-    final doc = html.parse(body);
     final result = <SubscriptionItem>[];
-    var included = false;
-    for (final element in doc.querySelectorAll('h2,h3,ul')) {
-      if (element.localName != 'ul') {
-        included = element.text.trim().toLowerCase() == 'included games:';
-        continue;
-      }
-      if (!included) continue;
-      for (final li in element.querySelectorAll('li')) {
-        final title = li.text.trim();
+    final match = RegExp(r'>Included games:[\s\S]*?<ul[^>]*>([\s\S]*?)</ul>', caseSensitive: false).firstMatch(body);
+    if (match != null) {
+      final itemsHtml = match[1]!;
+      final liMatches = RegExp(r'<li[^>]*>([\s\S]*?)</li>').allMatches(itemsHtml);
+      for (final li in liMatches) {
+        final title = li[1]!.replaceAll(RegExp(r'<[^>]*>'), '').trim();
         if (title.isEmpty) continue;
         result.add(SubscriptionItem(
             id: 'nso_genesis_${subscriptionTitleKey(title)}',
@@ -554,7 +552,6 @@ class SubscriptionSource {
             checkedAt: now,
             statusNote: 'SEGA Genesis · Versión clásica emulada'));
       }
-      break;
     }
     if (result.isEmpty) throw StateError('Genesis catalog unavailable');
     return result;

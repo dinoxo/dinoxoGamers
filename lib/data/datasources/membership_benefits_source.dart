@@ -153,11 +153,13 @@ class MembershipBenefitsSource {
 
   static List<MembershipBenefits> parseNintendo(
       String body, SubscriptionTier tier, DateTime now) {
-    final doc = html.parse(body);
-    final main = doc.querySelector('main') ?? doc.body!;
     final features = <String>{};
-    for (final heading in main.querySelectorAll('h2')) {
-      final text = _clean(heading.text);
+    final mainMatch = RegExp(r'<main[^>]*>([\s\S]*?)</main>').firstMatch(body);
+    final content = mainMatch != null ? mainMatch[1]! : body;
+    
+    final h2Matches = RegExp(r'<h2[^>]*>([\s\S]*?)</h2>').allMatches(content);
+    for (final match in h2Matches) {
+      final text = _clean(match[1]!.replaceAll(RegExp(r'<[^>]*>'), ''));
       if (text.startsWith('What ') ||
           text.contains('Frequently') ||
           text.startsWith('About ')) {
@@ -191,8 +193,9 @@ class MembershipBenefitsSource {
       }
     }
     if (tier == SubscriptionTier.nsoExpansion) {
-      for (final link in main.querySelectorAll('a')) {
-        final text = _clean(link.text);
+      final aMatches = RegExp(r'<a[^>]*>([\s\S]*?)</a>').allMatches(content);
+      for (final match in aMatches) {
+        final text = _clean(match[1]!.replaceAll(RegExp(r'<[^>]*>'), ''));
         if (RegExp(r'Happy Home Paradise|Booster Course Pass|Octo Expansion')
             .hasMatch(text)) {
           features
