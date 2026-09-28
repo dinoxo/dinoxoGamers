@@ -1,8 +1,8 @@
-$versionName = "1.6"
-$versionCode = 7
+$versionName = "1.7"
+$versionCode = 8
 $containerCpus = 4
 $containerMemory = "4g"
-$outputApkName = "DinoxoGamers-V1.6.apk"
+$outputApkName = "DinoxoGamers-V1.7.apk"
 
 $projectDir = "c:\IA\dinoxoGamers"
 $destProjectPath = [System.IO.Path]::Combine($projectDir, $outputApkName)
