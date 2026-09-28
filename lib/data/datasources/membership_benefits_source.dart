@@ -1,10 +1,44 @@
 import 'package:html/parser.dart' as html;
+import '../../core/constants/app_constants.dart';
 import '../../domain/models/membership_benefits.dart';
 import '../../domain/models/subscription_item.dart';
 
 /// Reads plan-specific features from the official US pages, never from a
 /// hardcoded entitlement list. Translations only label features actually found.
 class MembershipBenefitsSource {
+  static List<SubscriptionItem> parseNintendoMemberGames(
+      String body, DateTime now) {
+    final doc = html.parse(body);
+    final items = <SubscriptionItem>[];
+    for (final card in doc.querySelectorAll('[data-testid="card"]')) {
+      final link = card.querySelector('a[aria-label][href]');
+      final title = link?.attributes['aria-label'] ?? '';
+      final href = link?.attributes['href'] ?? '';
+      if (title.isEmpty ||
+          !href.startsWith('/us/store/products/') ||
+          !card.text.contains('Free download') ||
+          !card.text.contains(r'$0.00') ||
+          !card.text.contains('Games')) {
+        continue;
+      }
+      items.add(SubscriptionItem(
+          id: 'nso_member_$href',
+          title: title,
+          platform: GamePlatform.nintendo,
+          tier: SubscriptionTier.nsoStandard,
+          status: SubscriptionStatus.included,
+          category: SubscriptionCategory.catalog,
+          coverUrl: card.querySelector('img')?.attributes['src'] ?? '',
+          consoles: const ['Nintendo Switch'],
+          officialStoreUrl: 'https://www.nintendo.com$href',
+          sourceUrl: nintendoUrl,
+          checkedAt: now,
+          statusNote:
+              'Descarga sin coste adicional para miembros. Requiere Nintendo Switch Online para las funciones incluidas.'));
+    }
+    return items;
+  }
+
   static const playstationUrl = 'https://www.playstation.com/en-us/ps-plus/';
   static const xboxUrl = 'https://www.xbox.com/en-US/xbox-game-pass';
   static const nintendoUrl =

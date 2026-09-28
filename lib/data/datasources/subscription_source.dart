@@ -1,8 +1,10 @@
 import 'dart:convert';
+import 'dart:async';
 import 'dart:isolate';
 import 'package:html/parser.dart' as html;
 import 'package:http/http.dart' as http;
 import '../../core/constants/app_constants.dart';
+import '../../core/utils/background_job.dart';
 import '../../domain/models/subscription_item.dart';
 import '../../domain/models/membership_benefits.dart';
 import 'membership_benefits_source.dart';
@@ -20,6 +22,22 @@ enum _Parser {
   psBenefits,
   xboxBenefits,
   nintendoBenefits
+}
+
+class _CatalogFetch {
+  const _CatalogFetch(this.platform, this.now);
+  final GamePlatform platform;
+  final DateTime now;
+  Future<SubscriptionCatalog> call() async {
+    // All HTTP buffering, decoding, JSON traversal and HTML parsing happen in
+    // this worker. Only the small finished catalog crosses to Flutter.
+    final source = SubscriptionSource(client: http.Client());
+    try {
+      return await source.fetchCatalog(platform, now);
+    } finally {
+      source.close();
+    }
+  }
 }
 
 // A callable data object avoids accidentally sending an HTTP client captured by
@@ -73,6 +91,7 @@ class SubscriptionSource {
   final http.Client _client;
   final bool _backgroundParsing;
   final Map<GamePlatform, List<String>> _notices = {};
+  List<SubscriptionItem> _nintendoMemberGames = [];
   void close() => _client.close();
 
   // HTTP remains asynchronous; large DOM/JSON work must not stall Flutter frames.
@@ -86,12 +105,24 @@ class SubscriptionSource {
       'https://www.nintendo.com/us/store/products/sega-genesis-nintendo-switch-online-switch/';
 
   Future<String> _get(String url) async {
-    final response =
-        await _client.get(Uri.parse(url)).timeout(const Duration(seconds: 25));
-    if (response.statusCode != 200) {
-      throw StateError('Subscription HTTP ${response.statusCode}');
+    for (var attempt = 0; attempt < 2; attempt++) {
+      try {
+        final response = await _client
+            .get(Uri.parse(url))
+            .timeout(const Duration(seconds: 10));
+        if (response.statusCode == 200) return utf8.decode(response.bodyBytes);
+        if (attempt == 0 &&
+            [500, 502, 503, 504].contains(response.statusCode)) {
+          continue;
+        }
+        throw StateError('Subscription HTTP ${response.statusCode}');
+      } on TimeoutException {
+        if (attempt == 1) rethrow;
+      } on http.ClientException {
+        if (attempt == 1) rethrow;
+      }
     }
-    return utf8.decode(response.bodyBytes);
+    throw StateError('La conexión no respondió');
   }
 
   Future<List<SubscriptionItem>> fetch(
@@ -109,18 +140,32 @@ class SubscriptionSource {
 
   Future<SubscriptionCatalog> fetchCatalog(
       GamePlatform platform, DateTime now) async {
-    final games = fetch(platform, now);
+    if (_backgroundParsing) {
+      return runBackgroundJob(_CatalogFetch(platform, now).call);
+    }
+    _nintendoMemberGames = [];
+    var gamesVerified = true;
+    final games = fetch(platform, now).catchError((Object error) {
+      gamesVerified = false;
+      (_notices[platform] ??= [])
+          .add('No se pudo actualizar la lista de juegos: $error');
+      return <SubscriptionItem>[];
+    });
     final benefits = _fetchBenefits(platform, now)
         .catchError((Object _) => <MembershipBenefits>[]);
     final items = await games;
     final plans = await benefits;
-    return SubscriptionCatalog(items: items, benefits: plans, notices: [
-      ...?_notices[platform],
-      if (plans.isEmpty)
-        'No se pudieron comprobar los beneficios. Consulta la página oficial del plan.',
-      if (platform == GamePlatform.playstation)
-        'Sony publica «Última oportunidad para jugar» en la consola. Si una retirada no está fechada en su blog, la app no puede confirmar su fecha desde la web.',
-    ]);
+    return SubscriptionCatalog(
+        items: [...items, ..._nintendoMemberGames],
+        benefits: plans,
+        gamesVerified: gamesVerified,
+        notices: [
+          ...?_notices[platform],
+          if (plans.isEmpty)
+            'No se pudieron comprobar los beneficios. Consulta la página oficial del plan.',
+          if (platform == GamePlatform.playstation)
+            'Sony publica «Última oportunidad para jugar» en la consola. Si una retirada no está fechada en su blog, la app no puede confirmar su fecha desde la web.',
+        ]);
   }
 
   Future<List<MembershipBenefits>> _fetchBenefits(
@@ -131,9 +176,14 @@ class SubscriptionSource {
         SubscriptionTier.nsoExpansion: MembershipBenefitsSource.expansionUrl
       }.entries.map((plan) async {
         try {
+          final body = await _get(plan.value);
+          if (plan.key == SubscriptionTier.nsoStandard) {
+            _nintendoMemberGames =
+                MembershipBenefitsSource.parseNintendoMemberGames(body, now);
+          }
           final parsed = await _parse(_ParseTask<List<MembershipBenefits>>(
               _Parser.nintendoBenefits, now,
-              body: await _get(plan.value), tier: plan.key));
+              body: body, tier: plan.key));
           if (parsed.isEmpty) throw StateError('Plan structure changed');
           return parsed;
         } catch (_) {
@@ -178,12 +228,19 @@ class SubscriptionSource {
       'plus-monthly-games-list': SubscriptionTier.psEssential,
     };
     final lists = await Future.wait(kinds.entries.map((kind) async {
-      final url =
-          'https://www.playstation.com/bin/imagic/gameslist?locale=en-us&categoryList=${kind.key}';
-      final body = await _get(url);
-      final tier = kind.value;
-      return _parse(_ParseTask<List<SubscriptionItem>>(_Parser.playstation, now,
-          body: body, tier: tier));
+      try {
+        final url =
+            'https://www.playstation.com/bin/imagic/gameslist?locale=en-us&categoryList=${kind.key}';
+        final body = await _get(url);
+        final tier = kind.value;
+        return await _parse(_ParseTask<List<SubscriptionItem>>(
+            _Parser.playstation, now,
+            body: body, tier: tier));
+      } catch (_) {
+        (_notices[GamePlatform.playstation] ??= []).add(
+            'No se pudo actualizar ${kind.value.displayName}; se muestran las demás listas verificadas.');
+        return <SubscriptionItem>[];
+      }
     }));
     final catalog = lists.expand((items) => items).toList();
     if (catalog.isEmpty) throw StateError('Empty official PS catalog');
@@ -255,9 +312,16 @@ class SubscriptionSource {
         'platformContext': 'ConsoleGen8;ConsoleGen9',
         'subscriptionContext': entry.value[1],
       });
-      final list = jsonDecode(await _get(uri.toString())) as List;
-      for (final item in list.skip(1)) {
-        if (item['id'] is String) memberships[item['id'] as String] = entry.key;
+      try {
+        final list = jsonDecode(await _get(uri.toString())) as List;
+        for (final item in list.skip(1)) {
+          if (item['id'] is String) {
+            memberships[item['id'] as String] = entry.key;
+          }
+        }
+      } catch (_) {
+        (_notices[GamePlatform.xbox] ??= []).add(
+            'No se pudo actualizar ${entry.key.displayName}. El nivel mostrado es el que se pudo verificar.');
       }
     }
     if (memberships.isEmpty) throw StateError('Empty official Xbox catalog');
@@ -271,9 +335,15 @@ class SubscriptionSource {
             'displaycatalog.mp.microsoft.com',
             '/v7.0/products',
             {'bigIds': batch, 'market': 'US', 'languages': 'en-us'});
-        chunks.add(_get(uri.toString()).then((body) => _parse(
-            _ParseTask<List<SubscriptionItem>>(_Parser.xbox, now,
-                body: body, memberships: memberships))));
+        chunks.add(_get(uri.toString())
+            .then((body) => _parse(_ParseTask<List<SubscriptionItem>>(
+                _Parser.xbox, now,
+                body: body, memberships: memberships)))
+            .catchError((Object _) {
+          (_notices[GamePlatform.xbox] ??= []).add(
+              'Algunas fichas de Xbox no respondieron; la lista puede estar incompleta.');
+          return <SubscriptionItem>[];
+        }));
       }
       catalog.addAll((await Future.wait(chunks)).expand((items) => items));
     }

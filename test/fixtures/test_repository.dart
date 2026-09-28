@@ -15,6 +15,8 @@ class TestRepository extends GameRepository {
   @override
   Future<List<UserAlert>> getAlerts() async => [];
   @override
+  Future<Game?> getGameById(String id) async => null;
+  @override
   Future<bool> isFavorite(String gameId) async => false;
   @override
   Future<bool> isGameOwned(String gameId) async => false;

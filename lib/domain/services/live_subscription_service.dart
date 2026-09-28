@@ -27,9 +27,15 @@ class SubscriptionService extends ChangeNotifier {
   final Map<GamePlatform, String> errors = {};
   final Map<GamePlatform, DateTime> checkedAt = {};
   Future<void>? _pending;
+  DateTime? _lastAttempt;
   bool get loading => _pending != null;
 
   Future<void> ensureLoaded() {
+    if (_pending != null) return _pending!;
+    if (_lastAttempt != null &&
+        _clock().difference(_lastAttempt!) < const Duration(minutes: 2)) {
+      return Future.value();
+    }
     if (checkedAt.length == 3 &&
         checkedAt.values.every((time) =>
             _clock().difference(time) < const Duration(minutes: 30))) {
@@ -40,6 +46,7 @@ class SubscriptionService extends ChangeNotifier {
 
   Future<void> refresh() {
     if (_pending != null) return _pending!;
+    _lastAttempt = _clock();
     final task = _load();
     _pending = task;
     notifyListeners();
@@ -47,25 +54,27 @@ class SubscriptionService extends ChangeNotifier {
   }
 
   Future<void> _load() async {
-    await Future.wait(GamePlatform.values.map((platform) async {
+    // Serialize the three large downloads/parsers on memory-limited phones.
+    for (final platform in GamePlatform.values) {
       try {
         final catalog = await _source.fetchCatalog(platform, _clock());
-        _catalogs[platform] = catalog.items;
-        _benefits[platform] = catalog.benefits;
+        if (catalog.gamesVerified) {
+          _catalogs[platform] = catalog.items;
+          checkedAt[platform] = _clock();
+          errors.remove(platform);
+        } else {
+          errors[platform] =
+              'No se pudo actualizar ${AppConstants.platformDisplayName(platform)}. La última consulta sigue disponible; su vigencia no está confirmada.';
+        }
+        if (catalog.benefits.isNotEmpty) _benefits[platform] = catalog.benefits;
         notices[platform] = catalog.notices;
-        checkedAt[platform] = _clock();
-        errors.remove(platform);
       } catch (_) {
-        _catalogs.remove(platform);
-        checkedAt.remove(platform);
-        _benefits.remove(platform);
-        notices.remove(platform);
         errors[platform] =
-            'No se pudo verificar ${AppConstants.platformDisplayName(platform)}. Reintenta la consulta.';
+            'No se pudo actualizar ${AppConstants.platformDisplayName(platform)}. Se conserva la última consulta; comprueba tu conexión y actualiza cuando puedas.';
       }
       _rebuildIndex();
       notifyListeners();
-    }));
+    }
     _pending = null;
     notifyListeners();
   }
@@ -132,6 +141,7 @@ class SubscriptionService extends ChangeNotifier {
     final now = _clock();
     SubscriptionItem? best;
     for (final item in _titleIndex[key] ?? <SubscriptionItem>[]) {
+      if (errors.containsKey(item.platform)) continue;
       if (platform != null && item.platform != platform) continue;
       if (item.checkedAt == null ||
           now.difference(item.checkedAt!) > const Duration(hours: 24)) {

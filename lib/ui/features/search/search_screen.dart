@@ -3,6 +3,7 @@ import '../../../domain/services/subscription_title.dart';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../domain/services/ocr_service.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../data/datasources/web_scraper_service.dart';
@@ -39,6 +40,7 @@ class _SearchScreenState extends State<SearchScreen> {
   List<Game> _games = [];
   Set<String> _favorites = {};
   bool _readingPhoto = false;
+  bool _photoFlow = false;
 
   @override
   void initState() {
@@ -49,6 +51,8 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   Future<void> _restorePhoto() async {
+    if (_photoFlow) return;
+    _photoFlow = true;
     try {
       final lost = await ImagePicker().retrieveLostData();
       if (!mounted || lost.isEmpty) return;
@@ -63,26 +67,30 @@ class _SearchScreenState extends State<SearchScreen> {
     } catch (_) {
       // No pending selection is a normal state when the picker was not used.
     } finally {
+      _photoFlow = false;
       if (mounted) setState(() => _readingPhoto = false);
     }
   }
 
   Future<void> _photo(ImageSource source) async {
+    if (!mounted || _photoFlow) return;
+    _photoFlow = true;
     setState(() => _readingPhoto = true);
     try {
       final photo = widget.pickPhoto != null
           ? await widget.pickPhoto!(source)
-          : await ImagePicker()
-              .pickImage(source: source, maxWidth: 3000, imageQuality: 100);
-      if (photo != null) await _readPhoto(photo);
+          : await ImagePicker().pickImage(source: source);
+      if (mounted && photo != null) await _readPhoto(photo);
     } catch (error) {
       await _confirmPhoto([], error: OcrService.errorMessage(error));
     } finally {
+      _photoFlow = false;
       if (mounted) setState(() => _readingPhoto = false);
     }
   }
 
   Future<void> _readPhoto(XFile photo) async {
+    if (!mounted) return;
     try {
       final recognition = widget.readPhoto == null
           ? await OcrService.recognizePhoto(photo.path)
@@ -114,6 +122,9 @@ class _SearchScreenState extends State<SearchScreen> {
 
   @override
   void dispose() {
+    if (_readingPhoto && widget.readPhoto == null) {
+      unawaited(OcrService.cancelRecognition());
+    }
     _generation++;
     _debounce?.cancel();
     _controller.dispose();
@@ -187,7 +198,13 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
+  Widget build(BuildContext context) => _platform == null
+      ? _buildPage(context)
+      : Theme(
+          data: AppTheme.forPlatform(Theme.of(context), _platform!),
+          child: Builder(builder: _buildPage));
+
+  Widget _buildPage(BuildContext context) => Scaffold(
         appBar: AppBar(title: const Text('Buscar Juegos'), actions: [
           IconButton(
               tooltip: 'Leer título con la cámara',

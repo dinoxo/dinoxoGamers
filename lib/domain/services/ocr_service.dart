@@ -19,13 +19,29 @@ class OcrService {
   }
 
   static Future<PhotoRecognition> recognizePhoto(String imagePath) async {
-    final lines = await channel.invokeListMethod<String>('recognizeText',
-        {'path': imagePath}).timeout(const Duration(seconds: 20));
-    return fromLines(lines ?? []);
+    try {
+      final lines = await channel.invokeListMethod<String>('recognizeText',
+          {'path': imagePath}).timeout(const Duration(seconds: 20));
+      return fromLines(lines ?? []);
+    } on TimeoutException {
+      await cancelRecognition();
+      rethrow;
+    }
+  }
+
+  static Future<void> cancelRecognition() async {
+    try {
+      await channel
+          .invokeMethod<void>('cancelRecognition')
+          .timeout(const Duration(seconds: 1));
+    } catch (_) {
+      // Older native installations may not expose cancellation yet.
+    }
   }
 
   static PhotoRecognition fromLines(List<String> raw) {
-    final text = raw.join(' ');
+    final bounded = raw.take(100).where((line) => line.length <= 200).toList();
+    final text = bounded.join(' ');
     final hints = <GamePlatform>{
       if (RegExp(r'\b(?:playstation|ps[45])\b', caseSensitive: false)
           .hasMatch(text))
@@ -35,7 +51,7 @@ class OcrService {
       if (RegExp(r'\bnintendo\s+switch\b', caseSensitive: false).hasMatch(text))
         GamePlatform.nintendo,
     };
-    final lines = raw
+    final lines = bounded
         .map((s) => s
             .replaceAll(RegExp(r'[™®©]'), '')
             .replaceAll(RegExp(r'\s+'), ' ')
@@ -49,6 +65,7 @@ class OcrService {
     final candidates = <String, String>{};
     void add(String value) {
       if (value.length >= 2 &&
+          value.length <= 200 &&
           RegExp(r'[a-zà-ÿ]', caseSensitive: false).hasMatch(value)) {
         candidates.putIfAbsent(subscriptionTitleKey(value), () => value);
       }
@@ -89,6 +106,12 @@ class OcrService {
     }
     if (error is PlatformException) {
       switch (error.code) {
+        case 'OCR_TIMEOUT':
+          return 'La lectura tardó demasiado. Prueba una foto más clara o escribe el título.';
+        case 'OCR_BUSY':
+          return 'La lectura anterior está terminando. Espera unos segundos antes de elegir otra foto.';
+        case 'OCR_CANCELLED':
+          return 'Lectura cancelada. Puedes seleccionar otra foto.';
         case 'camera_access_denied':
         case 'camera_access_denied_without_prompt':
         case 'camera_access_restricted':

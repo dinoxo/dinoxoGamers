@@ -27,6 +27,13 @@ class DealCard extends StatelessWidget {
     final promoEnd = edition?.promoEndDate;
 
     return Card(
+      color: Color.alphaBlend(
+          AppTheme.platformColor(game.platform).withAlpha(25),
+          AppTheme.surface),
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+          side: BorderSide(
+              color: AppTheme.platformColor(game.platform), width: 1.5)),
       margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -45,6 +52,7 @@ class DealCard extends StatelessWidget {
                   color: AppTheme.surfaceElevated,
                   child: Image.network(
                     game.coverUrl,
+                    cacheWidth: 285,
                     fit: BoxFit.cover,
                     errorBuilder: (context, error, stackTrace) {
                       return Container(

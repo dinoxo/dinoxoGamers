@@ -4,6 +4,26 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   final now = DateTime(2026, 9, 28);
+  test('Nintendo member games use free US game cards and their own artwork',
+      () {
+    String card(String title, String path, String text) =>
+        '<div data-testid="card"><a aria-label="$title" href="$path"><img src="https://example.test/$title.jpg"></a>$text</div>';
+    final items = MembershipBenefitsSource.parseNintendoMemberGames(
+        [
+          card('Member Racer', '/us/store/products/racer/',
+              r'Free download $0.00 Games'),
+          card('Paid Game', '/us/store/products/paid/', r'$49.99 Games'),
+          card('Hardware', '/us/store/products/controller/',
+              r'Free download $0.00 Hardware'),
+          card('Foreign Game', '/en-gb/store/products/game/',
+              r'Free download $0.00 Games'),
+        ].join(),
+        now);
+    expect(items.single.title, 'Member Racer');
+    expect(items.single.coverUrl, 'https://example.test/Member Racer.jpg');
+    expect(items.single.tier, SubscriptionTier.nsoStandard);
+    expect(items.single.availableAt(now), true);
+  });
   test(
       'PS benefits are read from each plan, not inherited from Premium marketing',
       () {

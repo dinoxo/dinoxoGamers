@@ -27,11 +27,18 @@ Future<void> main(List<String> args) async {
   final counts = <String, int>{};
   final details = <String, dynamic>{};
   try {
-    await Future.wait(GamePlatform.values.map((platform) async {
+    for (final platform in GamePlatform.values) {
       final now = DateTime.now();
       final catalog = await source.fetchCatalog(platform, now);
       counts[platform.name] = catalog.items.length;
       details[platform.name] = {
+        'gamesVerified': catalog.gamesVerified,
+        'consoles': catalog.items.expand((i) => i.consoles).toSet().toList()
+          ..sort(),
+        'memberGames': catalog.items
+            .where((i) => i.id.startsWith('nso_member_'))
+            .map((i) => i.title)
+            .toList(),
         'current': catalog.items.where((i) => i.availableAt(now)).length,
         'monthly': catalog.items
             .where((i) =>
@@ -67,7 +74,7 @@ Future<void> main(List<String> args) async {
                 {'title': i.title, 'cover': i.coverUrl, 'tier': i.tier.name})
             .toList(),
       };
-    }));
+    }
   } finally {
     sample();
     timer.cancel();

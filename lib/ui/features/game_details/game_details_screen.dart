@@ -23,11 +23,13 @@ import 'widgets/sale_estimation_card.dart';
 class GameDetailsScreen extends StatefulWidget {
   final Game game;
   final GameRepository repository;
+  final String? selectedEditionId;
 
   const GameDetailsScreen({
     super.key,
     required this.game,
     required this.repository,
+    this.selectedEditionId,
   });
 
   @override
@@ -49,7 +51,12 @@ class _GameDetailsScreenState extends State<GameDetailsScreen> {
   void initState() {
     super.initState();
     _game = widget.game;
-    if (_game.primaryEdition != null) _selectedEdition = _game.primaryEdition!;
+    if (_game.primaryEdition != null) {
+      _selectedEdition = _game.editions
+              .where((e) => e.id == widget.selectedEditionId)
+              .firstOrNull ??
+          _game.primaryEdition!;
+    }
     _loadData();
     _refresh();
   }
@@ -60,12 +67,17 @@ class _GameDetailsScreenState extends State<GameDetailsScreen> {
       _refreshError = null;
     });
     try {
+      final selectedId = _game.primaryEdition == null
+          ? widget.selectedEditionId
+          : _selectedEdition.id;
       final current = await widget.repository.refreshGame(_game);
       if (!mounted) return;
       setState(() {
         _game = current;
         if (current.primaryEdition != null) {
-          _selectedEdition = current.primaryEdition!;
+          _selectedEdition =
+              current.editions.where((e) => e.id == selectedId).firstOrNull ??
+                  current.primaryEdition!;
         }
       });
       await _loadData();
@@ -164,7 +176,11 @@ class _GameDetailsScreenState extends State<GameDetailsScreen> {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => Theme(
+      data: AppTheme.forPlatform(Theme.of(context), _game.platform),
+      child: Builder(builder: _buildPage));
+
+  Widget _buildPage(BuildContext context) {
     if (_game.primaryEdition == null) {
       return Scaffold(
           appBar: AppBar(title: Text(_game.title), actions: [
@@ -245,6 +261,7 @@ class _GameDetailsScreenState extends State<GameDetailsScreen> {
                       child: Image.network(
                         _game.coverUrl,
                         fit: BoxFit.cover,
+                        cacheWidth: 330,
                         errorBuilder: (_, __, ___) => const Center(
                           child: Icon(Icons.sports_esports,
                               size: 40, color: AppTheme.textMuted),
@@ -257,10 +274,11 @@ class _GameDetailsScreenState extends State<GameDetailsScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 6,
                           children: [
                             PlatformBadge(platform: _game.platform),
-                            const SizedBox(width: 6),
                             const UsaBadge(),
                           ],
                         ),
@@ -344,8 +362,9 @@ class _GameDetailsScreenState extends State<GameDetailsScreen> {
                     ),
                     child: Column(
                       children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        Wrap(
+                          spacing: 12,
+                          runSpacing: 4,
                           children: [
                             const Text(
                               'Fin de la oferta:',
@@ -366,8 +385,9 @@ class _GameDetailsScreenState extends State<GameDetailsScreen> {
                           ],
                         ),
                         const SizedBox(height: 6),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        Wrap(
+                          spacing: 12,
+                          runSpacing: 4,
                           children: [
                             const Text(
                               'Última verificación:',
@@ -384,8 +404,9 @@ class _GameDetailsScreenState extends State<GameDetailsScreen> {
                         ),
                         if (_selectedEdition.requiresSubscription) ...[
                           const SizedBox(height: 6),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          Wrap(
+                            spacing: 12,
+                            runSpacing: 4,
                             children: [
                               const Text(
                                 'Condición especial:',
@@ -424,7 +445,7 @@ class _GameDetailsScreenState extends State<GameDetailsScreen> {
                     icon: const Icon(Icons.shopping_bag_outlined),
                     label: const Text('Comprar saldo en Dinoxo Store'),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.primary,
+                      backgroundColor: AppTheme.platformColor(_game.platform),
                       foregroundColor: Colors.white,
                     ),
                   ),

@@ -45,12 +45,13 @@ class LiveReviewSection extends StatelessWidget {
                 const Icon(Icons.analytics_outlined,
                     color: AppTheme.primaryLight, size: 20),
                 const SizedBox(width: 8),
-                Text(
+                Expanded(
+                    child: Text(
                   'Antes de comprar · ¿Vale la pena?',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.w700,
                       ),
-                ),
+                )),
               ],
             ),
             const SizedBox(height: 12),
@@ -61,7 +62,8 @@ class LiveReviewSection extends StatelessWidget {
               decoration: BoxDecoration(
                 color: verdictColor.withAlpha(25),
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: verdictColor.withAlpha(120), width: 1.2),
+                border:
+                    Border.all(color: verdictColor.withAlpha(120), width: 1.2),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -72,7 +74,8 @@ class LiveReviewSection extends StatelessWidget {
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          review?.verdictBadgeLabel ?? 'Sin puntuaciones verificables',
+                          review?.verdictBadgeLabel ??
+                              'Sin puntuaciones verificables',
                           style: TextStyle(
                             color: verdictColor,
                             fontSize: 14,
@@ -138,7 +141,8 @@ class LiveReviewSection extends StatelessWidget {
                   if (review.openCriticScore != null)
                     _buildScoreChip(
                       label: 'OpenCritic',
-                      value: '${review.openCriticScore!.toStringAsFixed(0)}/100',
+                      value:
+                          '${review.openCriticScore!.toStringAsFixed(0)}/100',
                       color: _getVerdictColor(review.openCriticScore),
                     ),
                 ],

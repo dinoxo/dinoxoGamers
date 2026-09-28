@@ -4,6 +4,7 @@ import '../../../core/utils/currency_formatter.dart';
 import '../../../core/utils/date_formatter.dart';
 import '../../../data/repositories/game_repository.dart';
 import '../../../domain/models/user_alert.dart';
+import '../../../domain/models/game.dart';
 import '../../../domain/services/notification_service.dart';
 import '../../core/widgets/empty_state_view.dart';
 import '../../core/widgets/platform_badge.dart';
@@ -25,6 +26,8 @@ class _AlertsScreenState extends State<AlertsScreen> {
   List<UserAlert> _alerts = [];
   bool _isLoading = true;
   bool _checking = false;
+  Map<String, Game> _games = {};
+  int _loadGeneration = 0;
 
   Future<void> _checkPrices() async {
     setState(() => _checking = true);
@@ -56,13 +59,41 @@ class _AlertsScreenState extends State<AlertsScreen> {
   }
 
   Future<void> _loadAlerts() async {
+    final generation = ++_loadGeneration;
     final alerts = await widget.repository.getAlerts();
-    if (mounted) {
+    final games = <String, Game>{};
+    for (final id in alerts.map((a) => a.gameId).toSet()) {
+      try {
+        final game = await widget.repository.getGameById(id);
+        if (game != null) games[id] = game;
+      } catch (_) {
+        // A missing/unreadable snapshot must not hide the saved price alert.
+      }
+    }
+    if (mounted && generation == _loadGeneration) {
       setState(() {
         _alerts = alerts;
+        _games = games;
         _isLoading = false;
       });
     }
+  }
+
+  void _openGame(UserAlert alert) {
+    final game = _games[alert.gameId];
+    if (game == null || game.platform != alert.platform) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text(
+              'Busca de nuevo el juego para recuperar su ficha. La alerta sigue guardada.')));
+      return;
+    }
+    Navigator.push(
+        context,
+        MaterialPageRoute<void>(
+            builder: (_) => GameDetailsScreen(
+                game: game,
+                repository: widget.repository,
+                selectedEditionId: alert.editionId)));
   }
 
   Future<void> _toggleAlert(UserAlert alert) async {
@@ -200,153 +231,179 @@ class _AlertsScreenState extends State<AlertsScreen> {
                         itemBuilder: (context, index) {
                           final alert = _alerts[index];
                           return Card(
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                side: BorderSide(
+                                    color: AppTheme.platformColor(
+                                        alert.platform))),
                             margin: const EdgeInsets.symmetric(
                                 horizontal: 14, vertical: 6),
-                            child: Padding(
-                              padding: const EdgeInsets.all(12),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    children: [
-                                      PlatformBadge(
-                                          platform: alert.platform,
-                                          compact: true),
-                                      const SizedBox(width: 8),
-                                      Expanded(
-                                        child: Text(
-                                          alert.gameTitle,
-                                          style: const TextStyle(
-                                            color: AppTheme.textPrimary,
-                                            fontSize: 15,
-                                            fontWeight: FontWeight.w700,
-                                          ),
-                                        ),
-                                      ),
-                                      Switch(
-                                        value: alert.isActive,
-                                        activeThumbColor: AppTheme.primary,
-                                        onChanged: (_) => _toggleAlert(alert),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 6),
-                                  Text(
-                                    'Edición: ${alert.editionName}',
-                                    style: const TextStyle(
-                                        color: AppTheme.textSecondary,
-                                        fontSize: 12),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
+                            child: InkWell(
+                                onTap: () => _openGame(alert),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(12),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Row(
                                         children: [
-                                          const Text(
-                                            'Objetivo: ',
-                                            style: TextStyle(
-                                                color: AppTheme.textMuted,
-                                                fontSize: 12),
-                                          ),
-                                          Text(
-                                            '<= ${CurrencyFormatter.formatUsd(alert.targetPrice)}',
-                                            style: const TextStyle(
-                                              color: AppTheme.success,
-                                              fontSize: 14,
-                                              fontWeight: FontWeight.w800,
+                                          SizedBox(
+                                              width: 52,
+                                              height: 72,
+                                              child: (_games[alert.gameId]
+                                                          ?.coverUrl
+                                                          .isNotEmpty ??
+                                                      false)
+                                                  ? Image.network(
+                                                      _games[alert.gameId]!
+                                                          .coverUrl,
+                                                      fit: BoxFit.cover,
+                                                      cacheWidth: 156,
+                                                      errorBuilder: (_, __,
+                                                              ___) =>
+                                                          const Icon(Icons
+                                                              .sports_esports))
+                                                  : const Icon(
+                                                      Icons.sports_esports)),
+                                          const SizedBox(width: 10),
+                                          PlatformBadge(
+                                              platform: alert.platform,
+                                              compact: true),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: Text(
+                                              alert.gameTitle,
+                                              style: const TextStyle(
+                                                color: AppTheme.textPrimary,
+                                                fontSize: 15,
+                                                fontWeight: FontWeight.w700,
+                                              ),
                                             ),
+                                          ),
+                                          Switch(
+                                            value: alert.isActive,
+                                            activeThumbColor:
+                                                AppTheme.platformColor(
+                                                    alert.platform),
+                                            onChanged: (_) =>
+                                                _toggleAlert(alert),
                                           ),
                                         ],
                                       ),
+                                      const SizedBox(height: 6),
                                       Text(
-                                        'Creada: ${DateFormatter.formatShortDate(alert.createdAt)}',
+                                        'Edición: ${alert.editionName}',
                                         style: const TextStyle(
-                                            color: AppTheme.textMuted,
-                                            fontSize: 10),
+                                            color: AppTheme.textSecondary,
+                                            fontSize: 12),
                                       ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Wrap(
-                                    spacing: 6,
-                                    children: [
-                                      if (alert.alertOnAllTimeLow)
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(
-                                              horizontal: 6, vertical: 2),
-                                          decoration: BoxDecoration(
-                                            color:
-                                                AppTheme.hotDeal.withAlpha(25),
-                                            borderRadius:
-                                                BorderRadius.circular(4),
-                                          ),
-                                          child: const Text(
-                                            'Mínimo histórico: pendiente de datos',
-                                            style: TextStyle(
-                                                color: AppTheme.hotDeal,
-                                                fontSize: 10,
-                                                fontWeight: FontWeight.w700),
-                                          ),
-                                        ),
-                                      if (alert.alertOnPromoEnding)
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(
-                                              horizontal: 6, vertical: 2),
-                                          decoration: BoxDecoration(
-                                            color:
-                                                AppTheme.warning.withAlpha(25),
-                                            borderRadius:
-                                                BorderRadius.circular(4),
-                                          ),
-                                          child: const Text(
-                                            'Fin de oferta: pendiente de fecha exacta',
-                                            style: TextStyle(
-                                                color: AppTheme.warning,
-                                                fontSize: 10,
-                                                fontWeight: FontWeight.w700),
-                                          ),
-                                        ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.end,
-                                    children: [
-                                      TextButton.icon(
-                                        onPressed: () async {
-                                          final game = await widget.repository
-                                              .getGameById(alert.gameId);
-                                          if (game != null && context.mounted) {
-                                            Navigator.push(
-                                              context,
-                                              MaterialPageRoute(
-                                                builder: (_) =>
-                                                    GameDetailsScreen(
-                                                  game: game,
-                                                  repository: widget.repository,
+                                      const SizedBox(height: 8),
+                                      Wrap(
+                                        spacing: 16,
+                                        runSpacing: 6,
+                                        children: [
+                                          Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              const Text(
+                                                'Objetivo: ',
+                                                style: TextStyle(
+                                                    color: AppTheme.textMuted,
+                                                    fontSize: 12),
+                                              ),
+                                              Text(
+                                                '<= ${CurrencyFormatter.formatUsd(alert.targetPrice)}',
+                                                style: const TextStyle(
+                                                  color: AppTheme.success,
+                                                  fontSize: 14,
+                                                  fontWeight: FontWeight.w800,
                                                 ),
                                               ),
-                                            );
-                                          }
-                                        },
-                                        icon: const Icon(
-                                            Icons.visibility_outlined,
-                                            size: 16),
-                                        label: const Text('Ver Juego',
-                                            style: TextStyle(fontSize: 12)),
+                                            ],
+                                          ),
+                                          Text(
+                                            'Creada: ${DateFormatter.formatShortDate(alert.createdAt)}',
+                                            style: const TextStyle(
+                                                color: AppTheme.textMuted,
+                                                fontSize: 10),
+                                          ),
+                                        ],
                                       ),
-                                      IconButton(
-                                        icon: const Icon(Icons.delete_outline,
-                                            color: AppTheme.danger, size: 20),
-                                        onPressed: () => _deleteAlert(alert),
+                                      const SizedBox(height: 8),
+                                      Wrap(
+                                        spacing: 6,
+                                        children: [
+                                          if (alert.alertOnAllTimeLow)
+                                            Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                      horizontal: 6,
+                                                      vertical: 2),
+                                              decoration: BoxDecoration(
+                                                color: AppTheme.hotDeal
+                                                    .withAlpha(25),
+                                                borderRadius:
+                                                    BorderRadius.circular(4),
+                                              ),
+                                              child: const Text(
+                                                'Mínimo histórico: pendiente de datos',
+                                                style: TextStyle(
+                                                    color: AppTheme.hotDeal,
+                                                    fontSize: 10,
+                                                    fontWeight:
+                                                        FontWeight.w700),
+                                              ),
+                                            ),
+                                          if (alert.alertOnPromoEnding)
+                                            Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                      horizontal: 6,
+                                                      vertical: 2),
+                                              decoration: BoxDecoration(
+                                                color: AppTheme.warning
+                                                    .withAlpha(25),
+                                                borderRadius:
+                                                    BorderRadius.circular(4),
+                                              ),
+                                              child: const Text(
+                                                'Fin de oferta: pendiente de fecha exacta',
+                                                style: TextStyle(
+                                                    color: AppTheme.warning,
+                                                    fontSize: 10,
+                                                    fontWeight:
+                                                        FontWeight.w700),
+                                              ),
+                                            ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.end,
+                                        children: [
+                                          TextButton.icon(
+                                            onPressed: () => _openGame(alert),
+                                            icon: const Icon(
+                                                Icons.visibility_outlined,
+                                                size: 16),
+                                            label: const Text('Ver Juego',
+                                                style: TextStyle(fontSize: 12)),
+                                          ),
+                                          IconButton(
+                                            icon: const Icon(
+                                                Icons.delete_outline,
+                                                color: AppTheme.danger,
+                                                size: 20),
+                                            onPressed: () =>
+                                                _deleteAlert(alert),
+                                          ),
+                                        ],
                                       ),
                                     ],
                                   ),
-                                ],
-                              ),
-                            ),
+                                )),
                           );
                         },
                       ),

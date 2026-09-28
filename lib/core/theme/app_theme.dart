@@ -14,13 +14,14 @@ class AppTheme {
   static const Color divider = Color(0xFF1E2636);
 
   // Accents & Signals
-  static const Color primary = Color(0xFF8B5CF6);      // Electric violet
+  static const Color primary = Color(0xFF8B5CF6); // Electric violet
   static const Color primaryLight = Color(0xFFA78BFA);
-  static const Color secondary = Color(0xFF06B6D4);    // Cyber cyan
-  static const Color success = Color(0xFF10B981);      // Emerald (good discount)
-  static const Color hotDeal = Color(0xFFF97316);      // Neon orange (all-time low)
-  static const Color danger = Color(0xFFEF4444);       // Crimson (ending soon / alert)
-  static const Color warning = Color(0xFFF59E0B);      // Amber
+  static const Color secondary = Color(0xFF06B6D4); // Cyber cyan
+  static const Color success = Color(0xFF10B981); // Emerald (good discount)
+  static const Color hotDeal = Color(0xFFF97316); // Neon orange (all-time low)
+  static const Color danger =
+      Color(0xFFEF4444); // Crimson (ending soon / alert)
+  static const Color warning = Color(0xFFF59E0B); // Amber
 
   // Console Brand Colors
   static const Color playStationColor = Color(0xFF00439C);
@@ -41,6 +42,22 @@ class AppTheme {
       case GamePlatform.xbox:
         return xboxColor;
     }
+  }
+
+  static ThemeData forPlatform(ThemeData base, GamePlatform platform) {
+    final color = platformColor(platform);
+    final bright = Color.lerp(color, Colors.white, .42)!;
+    return base.copyWith(
+      colorScheme:
+          base.colorScheme.copyWith(primary: bright, secondary: bright),
+      appBarTheme: base.appBarTheme
+          .copyWith(backgroundColor: color, foregroundColor: Colors.white),
+      inputDecorationTheme: base.inputDecorationTheme.copyWith(
+          focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: bright, width: 2))),
+      chipTheme: base.chipTheme.copyWith(selectedColor: color.withAlpha(85)),
+    );
   }
 
   static ThemeData get darkTheme {

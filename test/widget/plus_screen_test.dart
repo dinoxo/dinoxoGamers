@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:dinoxo_gamers/core/constants/app_constants.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:dinoxo_gamers/domain/models/subscription_item.dart';
@@ -8,6 +9,45 @@ import 'package:dinoxo_gamers/ui/features/subscriptions/plus_screen.dart';
 import '../fixtures/subscriptions.dart';
 
 void main() {
+  testWidgets(
+      'Nintendo opens internal plans, emulator library and DLC benefits',
+      (tester) async {
+    final source = TestSubscriptionSource([
+      subscription(
+          title: 'Super Mario Bros.',
+          platform: GamePlatform.nintendo,
+          tier: SubscriptionTier.nsoStandard)
+    ])
+      ..benefits = [
+        MembershipBenefits(
+            tier: SubscriptionTier.nsoStandard,
+            features: const ['Juego en línea'],
+            sourceUrl: 'https://www.nintendo.com/us/',
+            checkedAt: DateTime(2026, 9, 28)),
+        MembershipBenefits(
+            tier: SubscriptionTier.nsoExpansion,
+            features: const [
+              'Mario Kart Booster Course Pass · Requiere juego base'
+            ],
+            sourceUrl: 'https://www.nintendo.com/us/',
+            checkedAt: DateTime(2026, 9, 28))
+      ];
+    final service =
+        SubscriptionService(source: source, clock: () => DateTime(2026, 9, 28));
+    await service.refresh();
+    await tester.pumpWidget(
+        MaterialApp(home: PlusScreen(service: service, autoLoad: false)));
+    await tester.ensureVisible(find.text('Nintendo Switch Online'));
+    await tester.tap(find.text('Nintendo Switch Online'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Juego en línea'), findsOneWidget);
+    await tester.tap(find.text('Ver membresía').first);
+    await tester.pumpAndSettle();
+    expect(find.text('Juegos incluidos'), findsOneWidget);
+    expect(find.text('Super Mario Bros.'), findsOneWidget);
+    expect(find.text('Fuente oficial USA'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
   setUpAll(() => initializeDateFormatting('es'));
   testWidgets(
       'benefits are rendered from the loaded plan and are reachable on a phone',
