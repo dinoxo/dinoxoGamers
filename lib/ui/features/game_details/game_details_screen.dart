@@ -8,7 +8,7 @@ import '../../../domain/models/game.dart';
 import '../../../domain/models/game_edition.dart';
 import '../../../domain/models/price_observation.dart';
 import '../../../domain/models/sale_estimation.dart';
-import '../../../domain/models/user_alert.dart';
+import '../alerts/create_price_alert_sheet.dart';
 import '../../../domain/services/price_estimator_service.dart';
 import '../../../domain/services/subscription_service.dart';
 import '../../../domain/services/whatsapp_service.dart';
@@ -88,16 +88,19 @@ class _GameDetailsScreenState extends State<GameDetailsScreen> {
             _selectedEdition.id,
             _selectedEdition.regularPrice,
           );
-    final est = PriceEstimatorService.estimateNextSale(
-      observations: obs,
-      regularPrice: _selectedEdition.regularPrice,
-      currentPrice: _selectedEdition.currentPrice,
-      providerReportedLowest: _selectedEdition.providerReportedLowest,
-      platform: _game.platform,
-      gameTitle: _game.title,
-      promoEndDate: _selectedEdition.promoEndDate,
-      allowMarketProjection: true,
-    );
+    final edition = _game.primaryEdition == null ? null : _selectedEdition;
+    final est = edition == null
+        ? SaleEstimation.insufficient()
+        : PriceEstimatorService.estimateNextSale(
+            observations: obs,
+            regularPrice: edition.regularPrice,
+            currentPrice: edition.currentPrice,
+            providerReportedLowest: edition.providerReportedLowest,
+            platform: _game.platform,
+            gameTitle: _game.title,
+            promoEndDate: edition.promoEndDate,
+            allowMarketProjection: true,
+          );
 
     if (mounted) {
       setState(() {
@@ -145,130 +148,19 @@ class _GameDetailsScreenState extends State<GameDetailsScreen> {
     }
   }
 
-  void _showCreateAlertDialog() {
-    double targetPrice =
-        (_selectedEdition.currentPrice * 0.85 * 100).round() / 100;
-
-    showModalBottomSheet(
+  Future<void> _showCreateAlertDialog() async {
+    final message = await showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: AppTheme.surfaceElevated,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) {
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            return Padding(
-              padding: EdgeInsets.only(
-                left: 20,
-                right: 20,
-                top: 20,
-                bottom: MediaQuery.of(context).viewInsets.bottom + 24,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        'Crear Alerta de Precio',
-                        style: TextStyle(
-                          color: AppTheme.textPrimary,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                      IconButton(
-                        icon:
-                            const Icon(Icons.close, color: AppTheme.textMuted),
-                        onPressed: () => Navigator.pop(context),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    '${_game.title} · ${_selectedEdition.name}',
-                    style: const TextStyle(
-                        color: AppTheme.textSecondary, fontSize: 13),
-                  ),
-                  const SizedBox(height: 18),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        'Avisarme si baja a:',
-                        style: TextStyle(
-                            color: AppTheme.textPrimary,
-                            fontWeight: FontWeight.w600),
-                      ),
-                      Text(
-                        CurrencyFormatter.formatUsd(targetPrice),
-                        style: const TextStyle(
-                          color: AppTheme.success,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                    ],
-                  ),
-                  Slider(
-                    value: targetPrice.clamp(
-                        0.0,
-                        _selectedEdition.currentPrice > 0
-                            ? _selectedEdition.currentPrice
-                            : 1.0),
-                    min: 0.0,
-                    max: _selectedEdition.currentPrice > 0
-                        ? _selectedEdition.currentPrice
-                        : 1.0,
-                    divisions: 20,
-                    activeColor: AppTheme.primary,
-                    inactiveColor: AppTheme.border,
-                    onChanged: (val) {
-                      setModalState(
-                          () => targetPrice = (val * 100).round() / 100);
-                    },
-                  ),
-                  const Text(
-                      'Se comprobará al consultar precios en la app. No hay monitoreo con la aplicación cerrada.'),
-                  const SizedBox(height: 16),
-                  ElevatedButton(
-                    onPressed: () async {
-                      final alert = UserAlert(
-                        id: DateTime.now().millisecondsSinceEpoch.toString(),
-                        gameId: _game.id,
-                        editionId: _selectedEdition.id,
-                        gameTitle: _game.title,
-                        platform: _game.platform,
-                        editionName: _selectedEdition.name,
-                        targetPrice: targetPrice,
-                        alertOnAllTimeLow: false,
-                        alertOnPromoEnding: false,
-                        createdAt: DateTime.now(),
-                      );
-                      await widget.repository.saveAlert(alert);
-                      if (context.mounted) {
-                        Navigator.pop(context);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Alerta guardada exitosamente'),
-                            backgroundColor: AppTheme.success,
-                          ),
-                        );
-                      }
-                    },
-                    child: const Text('Guardar Alerta'),
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
+      builder: (_) => CreatePriceAlertSheet(
+          game: _game,
+          edition: _selectedEdition,
+          repository: widget.repository),
     );
+    if (mounted && message != null) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(message)));
+    }
   }
 
   @override
@@ -679,8 +571,14 @@ class _GameDetailsScreenState extends State<GameDetailsScreen> {
   }
 
   Widget _buildSubscriptionAdvisoryCard() {
-    final subMatch = SubscriptionService.instance
-        .checkGame(_game.title, platform: _game.platform);
+    return ListenableBuilder(
+        listenable: SubscriptionService.instance,
+        builder: (context, _) => _subscriptionAdvisoryContent());
+  }
+
+  Widget _subscriptionAdvisoryContent() {
+    final subMatch = SubscriptionService.instance.checkGame(_game.title,
+        platform: _game.platform, consoles: _game.consoles);
     if (subMatch == null) return const SizedBox.shrink();
 
     final isLeaving = subMatch.isLeavingSoon;

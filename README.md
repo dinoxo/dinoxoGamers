@@ -27,9 +27,19 @@ Las fechas de fin de oferta se muestran tal como las publica la fuente cuando es
 
 El icono de instalación usa el medallón circular de dinoxo.Store, completo y con transparencia exterior. Al iniciar una sesión nueva, una presentación de 2,6 segundos muestra primero el logo y luego «dinoxo.Store». La app carga sus datos durante la presentación. Esta no se repite al volver de minimizar y se descarta si se minimiza mientras se reproduce. Con movimiento reducido habilitado, muestra una entrada breve sin los efectos de escala o desplazamiento.
 
-La cámara y galería usan el selector existente de imágenes. Un puente Android invoca **ML Kit Text Recognition** con el modelo latino incluido (`com.google.mlkit:text-recognition:16.0.1`). Lee texto de la imagen localmente. El usuario selecciona/corrige el título reconocido y ese texto se busca en la web. No se envía la foto a un servidor de reconocimiento. Android mínimo: el mayor entre 23 y el mínimo de Flutter.
+La cámara y galería usan el selector de imágenes de Android. El permiso de cámara se solicita al usarla; el selector de fotos de Android 13 o posterior no requiere acceso a toda la galería. Un puente Android invoca **ML Kit Text Recognition** con el modelo latino incluido (`com.google.mlkit:text-recognition:16.0.1`), admite rutas locales y URI y lee el texto en el teléfono. Combina títulos repartidos entre líneas y descarta texto habitual del embalaje. El usuario confirma o corrige el título y se ejecuta la búsqueda web. Si no se lee texto, se puede escribir el título; un permiso denegado tiene su propio mensaje. Se recupera la selección cuando Android interrumpe la actividad durante el selector. No se envía la foto a un servidor de reconocimiento. Android mínimo: el mayor entre 23 y el mínimo de Flutter.
 
-Las alertas guardan el precio objetivo en SQLite. Se evalúan al consultar una ficha, cargar resultados que contienen el juego o pulsar actualizar en Mis Alertas. Requieren permiso para notificar, respetan el silencio de 22:00 a 08:00 y guardan la última notificación para evitar repeticiones. **No hay vigilancia en segundo plano con la app cerrada.** Los avisos por mínimo absoluto o 24 horas antes de finalizar necesitan datos adicionales; no se ofrecen como una función activa.
+Las alertas permiten escribir un importe exacto en USD con hasta dos decimales y lo guardan en SQLite para la edición elegida. Mis Alertas se actualiza al guardar, permite activar/desactivar y tiene actualización manual. Se compara el precio real consultado con el objetivo en centavos: se avisa si es igual o inferior. El permiso denegado conserva la alerta y explica cómo habilitarlo.
+
+WorkManager revisa las alertas activas en segundo plano con conexión a internet, con un intervalo solicitado de 15 minutos. Android puede retrasarlo por ahorro de batería; forzar la detención impide estos trabajos hasta abrir de nuevo la app. También se revisan al consultar precios en primer plano. Los avisos respetan el silencio de 22:00 a 08:00 y una espera de 24 horas por alerta; la prevención de duplicados persiste y coordina las comprobaciones de primer y segundo plano. No se prometen avisos instantáneos. Los avisos por mínimo absoluto o 24 horas antes de finalizar necesitan datos adicionales y no se ofrecen como una función activa.
+
+## Plus y membresías USA
+
+Plus consulta los catálogos públicos oficiales de PlayStation Plus, Xbox Game Pass para consola y Nintendo Switch Online de Estados Unidos. Combina las listas actuales con anuncios oficiales de altas y sus fechas; Nintendo incluye también el catálogo de SEGA Genesis. No necesita cuentas ni claves de pago.
+
+Los filtros separan los juegos disponibles ahora, las altas del mes en curso y los anuncios fechados para el mes siguiente. Si todavía no hay anuncios, se indica sin inventar juegos ni fechas. Se muestra el nivel requerido, consola, fuente y momento de la consulta. Un error al verificar una compañía aparece en pantalla y retira sus coincidencias anteriores. El catálogo se vuelve a consultar al abrir Plus o actualizarlo; se reutiliza durante 30 minutos.
+
+Ofertas, Buscar y las fichas comparten este catálogo y sugieren revisar la membresía antes de comprar. La coincidencia exige el mismo título y marca, conserva números de secuela, ediciones y complementos y descarta verificaciones de más de 24 horas. Los originales emulados de Nintendo no se usan para afirmar que un remake vendido para Switch está incluido. La app no conoce la suscripción del usuario ni los juegos mensuales que haya reclamado antes.
 
 ## Dinoxo Store
 
@@ -54,6 +64,7 @@ Prueba de consultas reales utilizando el mismo servicio Dart de la app:
 
 ```sh
 dart run tool/live_client_probe.dart
+dart run tool/live_subscription_probe.dart
 ```
 
 También se pueden obtener respuestas actuales y comprobar el parser contra ellas:
@@ -61,10 +72,12 @@ También se pueden obtener respuestas actuales y comprobar el parser contra ella
 ```sh
 node --use-system-ca tool/probe_live_catalog.mjs
 flutter test test/live/catalog_network_test.dart --dart-define=LIVE_CATALOG_PROBE=true
+node --use-system-ca tool/probe_subscriptions.mjs
+flutter test test/live/subscription_network_test.dart --dart-define=LIVE_SUBSCRIPTION_PROBE=true
 ```
 
-Las respuestas de comprobación se guardan en `build/live-probe`, excluido del código de producción. Las pruebas normales usan respuestas sintéticas aisladas en `test/fixtures` y no requieren internet. Si el contenedor Linux necesita las autoridades certificadoras del anfitrión, `tool/export_probe_certificates.mjs` exporta exclusivamente certificados públicos para la utilidad de comprobación; no cambia la validación TLS de la app.
+Las respuestas de comprobación se guardan en `build/live-probe` y `build/subscription-probe`, excluidos del código de producción. Las pruebas normales usan respuestas sintéticas aisladas en `test/fixtures` y no requieren internet. Si el contenedor Linux necesita las autoridades certificadoras del anfitrión, `tool/export_probe_certificates.mjs` exporta exclusivamente certificados públicos para la utilidad de comprobación; no cambia la validación TLS de la app.
 
 Desde `android`, `bash gradlew :app:compileDebugKotlin` verifica código Android sin empaquetar un APK. Cámara y notificaciones necesitan además una prueba posterior en un dispositivo Android.
 
-No se ha generado un APK en esta revisión. La versión del proyecto se conserva en `1.1.0+2`.
+No se ha generado un APK en esta revisión. La versión del proyecto se conserva en `1.3.0+4`.

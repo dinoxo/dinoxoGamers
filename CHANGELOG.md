@@ -2,6 +2,23 @@
 
 Todas las modificaciones notables de este proyecto se documentan en este archivo.
 
+## [1.4.0+5] - 2026-09-28
+
+### Corregido
+- Plus sustituye las listas fijas por consultas oficiales de suscripciones USA para PlayStation, Xbox de consola y Nintendo, incluido SEGA Genesis. Se muestran disponibilidad actual, altas del mes y anuncios fechados para el siguiente, con fuentes, nivel requerido y errores visibles.
+- Ofertas, Buscar y fichas consultan la misma información de membresías. Coincidencias estrictas evitan confundir secuelas, DLC, ediciones y remakes de Nintendo; el consejo de compra depende de que el usuario tenga la membresía correspondiente.
+- El consejo selecciona el nivel mínimo verificado. Un alta futura en otro plan conserva el acceso disponible hoy; se respetan los anuncios que pasan de diciembre a enero.
+- Cámara/galería: lectura de rutas y URI, combinación del título en varias líneas, errores diferenciados de permisos, recuperación de fotos al recrear la actividad y búsqueda web tras confirmar o corregir el texto. Una foto ilegible permite introducir el título.
+- Alertas con importe decimal exacto en USD, persistencia por edición, actualización inmediata de Mis Alertas y botón de actualización en su barra superior.
+- Revisión de precios en segundo plano mediante WorkManager, además de las consultas en primer plano. Avisos al alcanzar o bajar del objetivo, comparación en centavos, silencio nocturno y prevención de duplicados persistente entre comprobaciones concurrentes.
+- Denegar notificaciones conserva la alerta y permite habilitarlas después. Android puede retrasar los intervalos solicitados de 15 minutos.
+- Las fichas de resultados sin precio publicado se abren sin acceder a una edición inexistente.
+
+### Verificación
+- Pruebas de fuentes, fechas y coincidencias de membresías, búsquedas desde fotos y errores OCR, importes exactos, persistencia y notificaciones duplicadas.
+- Comprobación de consultas reales oficiales y compilación del código Kotlin de Android sin empaquetar APK. Versión conservada en `1.3.0+4`.
+- 69 pruebas generales aprobadas y una comprobación adicional con respuestas oficiales reales; análisis Flutter sin incidencias. Cámara y recepción de notificaciones pendientes de prueba física en un teléfono.
+
 ## [1.3.0+4] - 2026-09-27
 
 ### Añadido

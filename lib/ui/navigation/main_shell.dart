@@ -4,6 +4,7 @@ import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_theme.dart';
 import '../../data/repositories/game_repository.dart';
 import '../../domain/services/notification_service.dart';
+import '../../domain/services/subscription_service.dart';
 import '../core/widgets/usa_badge.dart';
 import '../features/alerts/alerts_screen.dart';
 import '../features/deals/deals_screen.dart';
@@ -33,8 +34,12 @@ class _MainShellState extends State<MainShell> {
     super.initState();
     _screens = [
       DealsScreen(repository: widget.repository),
-      SearchScreen(repository: widget.repository),
-      const PlusScreen(),
+      SearchScreen(
+          repository: widget.repository,
+          onRecoveredPhoto: () {
+            if (mounted) setState(() => _currentIndex = 1);
+          }),
+      const PlusScreen(autoLoad: false),
       AlertsScreen(repository: widget.repository),
       const DinoxoStoreScreen(),
     ];
@@ -63,7 +68,8 @@ class _MainShellState extends State<MainShell> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
         title: const Row(
           children: [
-            Icon(Icons.security_outlined, color: AppTheme.primaryLight, size: 24),
+            Icon(Icons.security_outlined,
+                color: AppTheme.primaryLight, size: 24),
             SizedBox(width: 10),
             Expanded(
               child: Text(
@@ -119,7 +125,7 @@ class _MainShellState extends State<MainShell> {
                         ),
                         SizedBox(height: 3),
                         Text(
-                          'Te avisará en tiempo real cuando un juego que sigas en Mis Alertas baje de precio o alcance tu valor deseado.',
+                          'Te avisará cuando una comprobación detecte que el juego alcanzó tu precio objetivo. Android puede retrasar las revisiones en segundo plano.',
                           style: TextStyle(
                             color: AppTheme.textMuted,
                             fontSize: 11,
@@ -215,7 +221,8 @@ class _MainShellState extends State<MainShell> {
             SizedBox(width: 8),
             Text(
               'Dinoxo Gamers',
-              style: TextStyle(color: AppTheme.textPrimary, fontWeight: FontWeight.w800),
+              style: TextStyle(
+                  color: AppTheme.textPrimary, fontWeight: FontWeight.w800),
             ),
           ],
         ),
@@ -225,12 +232,16 @@ class _MainShellState extends State<MainShell> {
           children: [
             const Text(
               'Versión 1.0.0 · Edición Gratuita Universal',
-              style: TextStyle(color: AppTheme.secondary, fontSize: 12, fontWeight: FontWeight.w700),
+              style: TextStyle(
+                  color: AppTheme.secondary,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 10),
             const Text(
               'Aplicación diseñada para la comunidad gamer. Permite consultar ofertas verificadas en PlayStation, Nintendo y Xbox para la región comercial de Estados Unidos (USD), analizar históricos y estimaciones, y adquirir saldo oficial en Dinoxo Store.',
-              style: TextStyle(color: AppTheme.textSecondary, fontSize: 12, height: 1.35),
+              style: TextStyle(
+                  color: AppTheme.textSecondary, fontSize: 12, height: 1.35),
             ),
             const SizedBox(height: 12),
             Container(
@@ -241,12 +252,16 @@ class _MainShellState extends State<MainShell> {
               ),
               child: const Row(
                 children: [
-                  Icon(Icons.check_circle_outline, color: AppTheme.success, size: 16),
+                  Icon(Icons.check_circle_outline,
+                      color: AppTheme.success, size: 16),
                   SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       'App 100% libre de licencias, pruebas y pagos por desbloqueo.',
-                      style: TextStyle(color: AppTheme.textPrimary, fontSize: 11, fontWeight: FontWeight.w600),
+                      style: TextStyle(
+                          color: AppTheme.textPrimary,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600),
                     ),
                   ),
                 ],
@@ -286,7 +301,8 @@ class _MainShellState extends State<MainShell> {
                       color: AppTheme.primary.withAlpha(50),
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: const Icon(Icons.sports_esports, color: AppTheme.primaryLight, size: 30),
+                    child: const Icon(Icons.sports_esports,
+                        color: AppTheme.primaryLight, size: 30),
                   ),
                   const SizedBox(height: 10),
                   const Text(
@@ -300,28 +316,36 @@ class _MainShellState extends State<MainShell> {
                   const SizedBox(height: 2),
                   const Text(
                     'PlayStation · Nintendo · Xbox (USA)',
-                    style: TextStyle(color: AppTheme.textSecondary, fontSize: 11),
+                    style:
+                        TextStyle(color: AppTheme.textSecondary, fontSize: 11),
                   ),
                 ],
               ),
             ),
             ListTile(
-              leading: const Icon(Icons.inventory_2_outlined, color: AppTheme.secondary),
-              title: const Text('Mi Biblioteca de Juegos', style: TextStyle(color: AppTheme.textPrimary)),
-              subtitle: const Text('Juegos que ya posees y comparador de ediciones', style: TextStyle(color: AppTheme.textMuted, fontSize: 11)),
+              leading: const Icon(Icons.inventory_2_outlined,
+                  color: AppTheme.secondary),
+              title: const Text('Mi Biblioteca de Juegos',
+                  style: TextStyle(color: AppTheme.textPrimary)),
+              subtitle: const Text(
+                  'Juegos que ya posees y comparador de ediciones',
+                  style: TextStyle(color: AppTheme.textMuted, fontSize: 11)),
               onTap: () {
                 Navigator.pop(context);
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => LibraryScreen(repository: widget.repository),
+                    builder: (_) =>
+                        LibraryScreen(repository: widget.repository),
                   ),
                 );
               },
             ),
             ListTile(
-              leading: const Icon(Icons.info_outline, color: AppTheme.primaryLight),
-              title: const Text('Acerca de Dinoxo Gamers', style: TextStyle(color: AppTheme.textPrimary)),
+              leading:
+                  const Icon(Icons.info_outline, color: AppTheme.primaryLight),
+              title: const Text('Acerca de Dinoxo Gamers',
+                  style: TextStyle(color: AppTheme.textPrimary)),
               onTap: () {
                 Navigator.pop(context);
                 _showInfoDialog();
@@ -342,7 +366,10 @@ class _MainShellState extends State<MainShell> {
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
         type: BottomNavigationBarType.fixed,
-        onTap: (index) => setState(() => _currentIndex = index),
+        onTap: (index) {
+          setState(() => _currentIndex = index);
+          if (index == 2) SubscriptionService.instance.ensureLoaded();
+        },
         items: const [
           BottomNavigationBarItem(
             icon: Icon(Icons.local_offer_outlined),

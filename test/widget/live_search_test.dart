@@ -74,6 +74,18 @@ void main() {
     expect(find.byType(Slider), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+  testWidgets('alert accepts an exact custom decimal price', (tester) async {
+    final game = LiveWebScraperService.parseItem(
+            offerHtml(price: 1999),
+            Uri.parse('https://www.dekudeals.com/items/test?country=us'),
+            DateTime.now())
+        .single;
+    await tester.pumpWidget(MaterialApp(
+        home: GameDetailsScreen(game: game, repository: TestRepository())));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Crear Alerta'));
+    await tester.tap(find.text('Crear Alerta'));
+    await tester.pumpAndSettle();
+    expect(find.byType(TextFormField), findsOneWidget);
+  });
 }
-
-

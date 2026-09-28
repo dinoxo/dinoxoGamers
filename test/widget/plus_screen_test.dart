@@ -1,40 +1,32 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:dinoxo_gamers/core/theme/app_theme.dart';
+import 'package:intl/date_symbol_data_local.dart';
+import 'package:dinoxo_gamers/domain/models/subscription_item.dart';
+import 'package:dinoxo_gamers/domain/services/subscription_service.dart';
 import 'package:dinoxo_gamers/ui/features/subscriptions/plus_screen.dart';
+import '../fixtures/subscriptions.dart';
 
 void main() {
-  testWidgets('PlusScreen renders header, search, platform chips and items',
-      (WidgetTester tester) async {
+  setUpAll(() => initializeDateFormatting('es'));
+  testWidgets(
+      'Plus uses a verified catalog and shows no announcement as an explicit state',
+      (tester) async {
+    final service = SubscriptionService(
+        source: TestSubscriptionSource([
+          subscription(start: DateTime(2026, 9, 15)),
+        ]),
+        clock: () => DateTime(2026, 9, 27));
+    await service.refresh();
     await tester.pumpWidget(
-      MaterialApp(
-        theme: AppTheme.darkTheme,
-        home: const PlusScreen(),
-      ),
-    );
+        MaterialApp(home: PlusScreen(service: service, autoLoad: false)));
     await tester.pumpAndSettle();
-
-    // Verify AppBar title
     expect(find.text('Plus & Suscripciones'), findsOneWidget);
-
-    // Verify Platform Chips
-    expect(find.text('Todos'), findsWidgets);
-    expect(find.text('PlayStation Plus'), findsOneWidget);
-    expect(find.text('Xbox Game Pass'), findsOneWidget);
-    expect(find.text('Nintendo Switch Online'), findsOneWidget);
-
-    // Verify filter by PlayStation Plus
-    await tester.tap(find.text('PlayStation Plus'));
+    expect(find.text('Resident Evil 2'), findsOneWidget);
+    await tester.tap(find.text('Mes siguiente'));
     await tester.pumpAndSettle();
-
-    // Should find PlayStation games
-    expect(find.text('Harry Potter: Quidditch Champions'), findsOneWidget);
-
-    // Filter by Xbox
-    await tester.tap(find.text('Xbox Game Pass'));
-    await tester.pumpAndSettle();
-
-    // Should find Xbox games
-    expect(find.text('Starfield'), findsOneWidget);
+    expect(find.textContaining('Aún no hay juegos con fecha confirmada'),
+        findsOneWidget);
+    expect(
+        service.getItems(category: SubscriptionCategory.comingSoon), isEmpty);
   });
 }

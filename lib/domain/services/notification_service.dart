@@ -10,13 +10,13 @@ class NotificationService {
   bool _isInitialized = false;
 
   // Duplicate prevention cache
-  final Set<String> _recentlyDispatchedAlerts = {};
+  final Map<String, DateTime> _recentlyDispatchedAlerts = {};
 
   Future<void> initialize() async {
     if (_isInitialized) return;
 
     const androidSettings =
-        AndroidInitializationSettings('@mipmap/ic_launcher');
+        AndroidInitializationSettings('ic_stat_price_alert');
     const initSettings = InitializationSettings(android: androidSettings);
 
     try {
@@ -36,12 +36,15 @@ class NotificationService {
   /// Request notification permission in context
   Future<bool> requestPermission() async {
     try {
+      await initialize();
       final androidImplementation =
           _notificationsPlugin.resolvePlatformSpecificImplementation<
               AndroidFlutterLocalNotificationsPlugin>();
       final granted =
           await androidImplementation?.requestNotificationsPermission();
-      return granted ?? false;
+      return granted ??
+          await androidImplementation?.areNotificationsEnabled() ??
+          false;
     } catch (_) {
       return false;
     }
@@ -70,7 +73,8 @@ class NotificationService {
   }) async {
     // 1. Check duplicate cooldown
     final alertKey = '${alert.id}_${newPrice.toStringAsFixed(2)}';
-    if (_recentlyDispatchedAlerts.contains(alertKey)) {
+    final previous = _recentlyDispatchedAlerts[alertKey];
+    if (previous != null && DateTime.now().difference(previous).inHours < 24) {
       return false; // Prevent duplicate
     }
 
@@ -87,6 +91,7 @@ class NotificationService {
           'Avisos al consultar un juego que alcanza tu precio objetivo.',
       importance: Importance.high,
       priority: Priority.high,
+      icon: 'ic_stat_price_alert',
     );
     const notificationDetails = NotificationDetails(android: androidDetails);
 
@@ -97,14 +102,18 @@ class NotificationService {
     try {
       if (!_isInitialized) await initialize();
       if (!_isInitialized) return false;
+      final android =
+          _notificationsPlugin.resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin>();
+      if (await android?.areNotificationsEnabled() != true) return false;
       await _notificationsPlugin.show(
-        alert.id.hashCode,
+        alert.id.hashCode & 0x7fffffff,
         title,
         body,
         notificationDetails,
         payload: alert.gameId,
       );
-      _recentlyDispatchedAlerts.add(alertKey);
+      _recentlyDispatchedAlerts[alertKey] = DateTime.now();
       return true;
     } catch (_) {
       return false;

@@ -3,6 +3,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'core/theme/app_theme.dart';
 import 'data/repositories/game_repository.dart';
 import 'domain/services/notification_service.dart';
+import 'domain/services/subscription_service.dart';
 import 'ui/features/startup/startup_gate.dart';
 
 void main() async {
@@ -13,6 +14,8 @@ void main() async {
 
   // Initialize shared repository
   final gameRepository = GameRepository();
+  gameRepository.synchronizeAlertMonitoring();
+  SubscriptionService.instance.ensureLoaded();
 
   runApp(DinoxoGamersApp(repository: gameRepository));
 }

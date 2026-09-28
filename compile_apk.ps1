@@ -1,8 +1,8 @@
-$versionName = "1.3"
-$versionCode = 4
+$versionName = "1.4"
+$versionCode = 5
 $containerCpus = 4
-$containerMemory = "8g"
-$outputApkName = "DinoxoGamers-V1.3.apk"
+$containerMemory = "4g"
+$outputApkName = "DinoxoGamers-V1.4.apk"
 
 $projectDir = "c:\IA\dinoxoGamers"
 $destProjectPath = [System.IO.Path]::Combine($projectDir, $outputApkName)
@@ -22,7 +22,7 @@ $containerId = (docker run -d --cpus $containerCpus --memory $containerMemory `
     -v dinoxo_android_ndk:/opt/android-sdk-linux/ndk `
     -v dinoxo_android_platforms:/opt/android-sdk-linux/platforms `
     -v dinoxo_android_cmake:/opt/android-sdk-linux/cmake `
-    ghcr.io/cirruslabs/flutter:stable sleep 3600)
+    ghcr.io/cirruslabs/flutter:stable sleep 7200)
 
 if (-not $containerId -or $LASTEXITCODE -ne 0) {
     throw "Fallo al iniciar el contenedor de compilacion."
@@ -35,7 +35,7 @@ try {
     docker cp "${projectDir}/." "${containerId}:/app"
 
     Write-Host "[3/4] Ejecutando análisis, tests y compilando APK Release..."
-    docker exec -w /app -e GRADLE_OPTS="-Dorg.gradle.jvmargs='-Xmx4g -XX:+UseParallelGC' -Dorg.gradle.parallel=true -Dorg.gradle.workers.max=$containerCpus" $containerId bash -c "flutter pub get && flutter test && flutter build apk --release --build-name=$versionName --build-number=$versionCode"
+    docker exec -w /app -e GRADLE_OPTS="-Dorg.gradle.jvmargs='-Xmx2048m -XX:+UseParallelGC' -Dorg.gradle.parallel=true -Dorg.gradle.workers.max=2" $containerId bash -c "flutter pub get && flutter test && flutter build apk --release --build-name=$versionName --build-number=$versionCode"
 
 
     if ($LASTEXITCODE -ne 0) {
