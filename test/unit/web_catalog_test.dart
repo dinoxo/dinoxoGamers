@@ -119,6 +119,31 @@ void main() {
   });
 
   test(
+      'one failed edition remains a visible partial search, not a unique match',
+      () async {
+    final web = LiveWebScraperService(client: MockClient((request) async {
+      if (request.method == 'POST') {
+        return http.Response('', 303,
+            headers: {'set-cookie': 'rack.session=test;'});
+      }
+      if (request.url.path == '/search') {
+        return http.Response(listingHtml(['ghost-ps4', 'ghost-ps5']), 200);
+      }
+      if (request.url.path.endsWith('ghost-ps5')) {
+        return http.Response('Unavailable', 503);
+      }
+      return http.Response(
+          '<h1>Ghost of Tsushima</h1>${offerHtml(title: 'Ghost of Tsushima')}',
+          200);
+    }));
+    addTearDown(web.close);
+    final result = await web.searchWebGames('Ghost of Tsushima');
+    expect(result.games, hasLength(1));
+    expect(result.hasMore, false);
+    expect(result.warnings, isNotEmpty);
+  });
+
+  test(
       'pagination reaches second source page after six batches, preserving search',
       () async {
     final requests = <Uri>[];

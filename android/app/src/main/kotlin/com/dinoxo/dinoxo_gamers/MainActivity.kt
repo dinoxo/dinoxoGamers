@@ -8,8 +8,15 @@ import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import java.io.File
+import java.util.concurrent.Executors
 
 class MainActivity : FlutterActivity() {
+    private val photoReader = Executors.newSingleThreadExecutor()
+
+    override fun onDestroy() {
+        photoReader.shutdown()
+        super.onDestroy()
+    }
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.dinoxo.gamers/ocr")
@@ -31,13 +38,21 @@ class MainActivity : FlutterActivity() {
                     result.error("IMAGE_MISSING", "La imagen ya no está disponible. Selecciónala de nuevo.", null)
                     return@setMethodCallHandler
                 }
+                photoReader.execute {
                 val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
                 try {
                     // ML Kit resolves EXIF rotation and supports photo-picker content URIs.
                     val input = InputImage.fromFilePath(this, uri)
                     recognizer.process(input)
                         .addOnSuccessListener { text ->
-                            result.success(text.textBlocks.flatMap { block -> block.lines.map { it.text } })
+                            // Large logo lettering is usually the title. Return a
+                            // whole block plus its lines so split logos remain searchable.
+                            val blocks = text.textBlocks.sortedByDescending { block ->
+                                block.lines.maxOfOrNull { it.boundingBox?.height() ?: 0 } ?: 0
+                            }
+                            result.success(blocks.flatMap { block ->
+                                listOf(block.lines.joinToString(" ") { it.text }) + block.lines.map { it.text }
+                            }.distinct())
                         }
                         .addOnFailureListener {
                             result.error("OCR_FAILED", "No se pudo reconocer el texto de la imagen.", null)
@@ -49,6 +64,7 @@ class MainActivity : FlutterActivity() {
                 } catch (_: Exception) {
                     recognizer.close()
                     result.error("IMAGE_INVALID", "El formato de imagen no es compatible.", null)
+                }
                 }
             }
     }

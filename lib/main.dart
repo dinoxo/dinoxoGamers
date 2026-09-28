@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'core/theme/app_theme.dart';
 import 'data/repositories/game_repository.dart';
@@ -9,15 +10,13 @@ import 'ui/features/startup/startup_gate.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize notification service safely
-  await NotificationService.instance.initialize();
-
-  // Initialize shared repository
   final gameRepository = GameRepository();
-  gameRepository.synchronizeAlertMonitoring();
-  SubscriptionService.instance.ensureLoaded();
-
   runApp(DinoxoGamersApp(repository: gameRepository));
+  WidgetsBinding.instance.addPostFrameCallback((_) async {
+    await NotificationService.instance.initialize();
+    unawaited(gameRepository.synchronizeAlertMonitoring());
+    unawaited(SubscriptionService.instance.ensureLoaded());
+  });
 }
 
 class DinoxoGamersApp extends StatelessWidget {

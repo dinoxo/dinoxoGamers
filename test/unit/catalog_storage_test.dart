@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'dart:convert';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:dinoxo_gamers/core/constants/app_constants.dart';
 import 'package:dinoxo_gamers/data/datasources/local_database_service.dart';
@@ -41,6 +42,27 @@ void main() {
     local = LocalDatabaseService.withDatabase(db);
   });
   tearDown(() async => db.close());
+
+  test('old cached artwork is hidden while the favorite and price survive',
+      () async {
+    final game = LiveWebScraperService.parseItem(
+            offerHtml(title: "Ghost of Tsushima DIRECTOR'S CUT"),
+            Uri.parse('https://www.dekudeals.com/items/ghost?country=us'),
+            DateTime(2026, 9, 28))
+        .single;
+    await db.insert('settings', {
+      'key': 'catalog_v1:${game.id}',
+      'value': jsonEncode({
+        ...game.toMap(),
+        'coverUrl': 'https://example.com/zelda.jpg',
+        'editions': game.editions.map((e) => e.toMap()).toList(),
+      })
+    });
+    final cached = (await local.readCatalogSnapshots()).single;
+    expect(cached.coverUrl, isEmpty);
+    expect(cached.id, game.id);
+    expect(cached.currentPrice, 19.99);
+  });
 
   test('fresh prices replace same IDs and favorites survive repository restart',
       () async {

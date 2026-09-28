@@ -43,6 +43,8 @@ enum SubscriptionCategory {
   catalog('Catálogo'),
   classics('Clásicos / Retro'),
   leavingSoon('Saliendo Pronto'),
+  upcoming('Próximos ingresos'),
+  benefits('Beneficios'),
   comingSoon('Mes siguiente');
 
   final String label;
@@ -100,17 +102,21 @@ class SubscriptionItem {
           title: title,
           platform: platform,
           tier: tier,
-          status: status,
+          status: announcement.status == SubscriptionStatus.leavingSoon
+              ? announcement.status
+              : status,
           category: category,
           coverUrl: coverUrl,
           consoles: consoles,
           officialStoreUrl: officialStoreUrl,
-          sourceUrl: sourceUrl,
+          sourceUrl: announcement.sourceUrl.isEmpty
+              ? sourceUrl
+              : announcement.sourceUrl,
           checkedAt: checkedAt,
-          addedAt: announcement.addedAt,
-          availableUntil: announcement.availableUntil,
-          releaseDate: announcement.releaseDate,
-          expiryDate: announcement.expiryDate,
+          addedAt: announcement.addedAt ?? addedAt,
+          availableUntil: announcement.availableUntil ?? availableUntil,
+          releaseDate: announcement.releaseDate ?? releaseDate,
+          expiryDate: announcement.expiryDate ?? expiryDate,
           statusNote: announcement.statusNote,
           availabilityConfirmed: availabilityConfirmed);
 
@@ -179,7 +185,7 @@ class SubscriptionMatch {
 
   String get advisoryMessage {
     if (isLeavingSoon) {
-      return 'Este juego dejará de estar disponible pronto en ${item.serviceName} (${item.tier.displayName})${item.statusNote != null ? ' - ${item.statusNote}' : ''}. Si querés conservarlo para siempre, ¡este es el mejor momento para aprovechar la oferta antes de que salga!';
+      return 'La fuente anuncia la salida de ${item.serviceName} (${item.tier.displayName})${item.expiryDate != null ? ' el ${item.expiryDate}' : ''}. Si ya tienes acceso, comprueba la fecha antes de empezar. Para conservarlo después, revisa la edición y su precio antes de comprar.';
     }
     if (isComingSoon) {
       return 'Este título llegará próximamente al catálogo de ${item.serviceName} (${item.tier.displayName})${item.statusNote != null ? ' (${item.statusNote})' : ''}. Si estás suscrito o pensás suscribirte, te sugerimos esperar y no gastar de más.';

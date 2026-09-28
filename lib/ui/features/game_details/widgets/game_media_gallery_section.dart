@@ -14,7 +14,8 @@ class GameMediaGallerySection extends StatefulWidget {
   });
 
   @override
-  State<GameMediaGallerySection> createState() => _GameMediaGallerySectionState();
+  State<GameMediaGallerySection> createState() =>
+      _GameMediaGallerySectionState();
 }
 
 class _GameMediaGallerySectionState extends State<GameMediaGallerySection> {
@@ -29,7 +30,9 @@ class _GameMediaGallerySectionState extends State<GameMediaGallerySection> {
   @override
   void didUpdateWidget(covariant GameMediaGallerySection oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.game.id != widget.game.id) {
+    if (oldWidget.game.id != widget.game.id ||
+        oldWidget.game.title != widget.game.title ||
+        oldWidget.game.coverUrl != widget.game.coverUrl) {
       _loadMedia();
     }
   }
@@ -38,7 +41,8 @@ class _GameMediaGallerySectionState extends State<GameMediaGallerySection> {
     _mediaFuture = GameMediaService.instance.fetchMedia(widget.game);
   }
 
-  void _showImageFullscreen(BuildContext context, List<String> images, int initialIndex) {
+  void _showImageFullscreen(
+      BuildContext context, List<String> images, int initialIndex) {
     showDialog(
       context: context,
       barrierColor: Colors.black.withAlpha(235),
@@ -85,7 +89,8 @@ class _GameMediaGallerySectionState extends State<GameMediaGallerySection> {
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           IconButton(
-                            icon: const Icon(Icons.chevron_left, color: Colors.white),
+                            icon: const Icon(Icons.chevron_left,
+                                color: Colors.white),
                             onPressed: currentIndex > 0
                                 ? () => setModalState(() => currentIndex--)
                                 : null,
@@ -93,11 +98,14 @@ class _GameMediaGallerySectionState extends State<GameMediaGallerySection> {
                           const SizedBox(width: 16),
                           Text(
                             '${currentIndex + 1} / ${images.length}',
-                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                            style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold),
                           ),
                           const SizedBox(width: 16),
                           IconButton(
-                            icon: const Icon(Icons.chevron_right, color: Colors.white),
+                            icon: const Icon(Icons.chevron_right,
+                                color: Colors.white),
                             onPressed: currentIndex < images.length - 1
                                 ? () => setModalState(() => currentIndex++)
                                 : null,
@@ -129,7 +137,7 @@ class _GameMediaGallerySectionState extends State<GameMediaGallerySection> {
                   CircularProgressIndicator(strokeWidth: 2),
                   SizedBox(height: 12),
                   Text(
-                    'Cargando capturas y videos oficiales...',
+                    'Buscando capturas del juego...',
                     style: TextStyle(color: AppTheme.textMuted, fontSize: 12),
                   ),
                 ],
@@ -156,22 +164,23 @@ class _GameMediaGallerySectionState extends State<GameMediaGallerySection> {
                     const Icon(Icons.photo_library_outlined,
                         color: AppTheme.primaryLight, size: 20),
                     const SizedBox(width: 8),
-                    Text(
+                    Expanded(
+                        child: Text(
                       'Fotos y Videos del Juego',
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                             fontWeight: FontWeight.w700,
                           ),
-                    ),
-                    const Spacer(),
+                    )),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 7, vertical: 2),
                       decoration: BoxDecoration(
                         color: AppTheme.surfaceSubtle,
                         borderRadius: BorderRadius.circular(4),
                         border: Border.all(color: AppTheme.border),
                       ),
                       child: Text(
-                        '${media.screenshots.length} fotos · 2 videos',
+                        '${media.screenshots.length} fotos',
                         style: const TextStyle(
                           color: AppTheme.secondary,
                           fontSize: 10,
@@ -185,7 +194,7 @@ class _GameMediaGallerySectionState extends State<GameMediaGallerySection> {
 
                 // Screenshots Horizontal Gallery
                 const Text(
-                  'Capturas de pantalla (Toca para ampliar)',
+                  'Capturas verificadas · versión de PC en Steam',
                   style: TextStyle(
                     color: AppTheme.textSecondary,
                     fontSize: 12,
@@ -193,61 +202,68 @@ class _GameMediaGallerySectionState extends State<GameMediaGallerySection> {
                   ),
                 ),
                 const SizedBox(height: 8),
-                SizedBox(
-                  height: 120,
-                  child: ListView.separated(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: media.screenshots.length,
-                    separatorBuilder: (_, __) => const SizedBox(width: 8),
-                    itemBuilder: (context, index) {
-                      final url = media.screenshots[index];
-                      return GestureDetector(
-                        onTap: () => _showImageFullscreen(context, media.screenshots, index),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: Stack(
-                            children: [
-                              Container(
-                                width: 190,
-                                height: 120,
-                                color: AppTheme.surfaceElevated,
-                                child: Image.network(
-                                  url,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (_, __, ___) => const Center(
-                                    child: Icon(Icons.broken_image,
-                                        color: AppTheme.textMuted),
+                if (media.screenshots.isEmpty)
+                  const Text(
+                      'No hay capturas verificadas para este título y edición.',
+                      style:
+                          TextStyle(color: AppTheme.textMuted, fontSize: 12)),
+                if (media.screenshots.isNotEmpty)
+                  SizedBox(
+                    height: 120,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: media.screenshots.length,
+                      separatorBuilder: (_, __) => const SizedBox(width: 8),
+                      itemBuilder: (context, index) {
+                        final url = media.screenshots[index];
+                        return GestureDetector(
+                          onTap: () => _showImageFullscreen(
+                              context, media.screenshots, index),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Stack(
+                              children: [
+                                Container(
+                                  width: 190,
+                                  height: 120,
+                                  color: AppTheme.surfaceElevated,
+                                  child: Image.network(
+                                    url,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (_, __, ___) => const Center(
+                                      child: Icon(Icons.broken_image,
+                                          color: AppTheme.textMuted),
+                                    ),
                                   ),
                                 ),
-                              ),
-                              Positioned(
-                                right: 6,
-                                bottom: 6,
-                                child: Container(
-                                  padding: const EdgeInsets.all(3),
-                                  decoration: BoxDecoration(
-                                    color: Colors.black.withAlpha(160),
-                                    borderRadius: BorderRadius.circular(4),
-                                  ),
-                                  child: const Icon(
-                                    Icons.fullscreen,
-                                    color: Colors.white,
-                                    size: 16,
+                                Positioned(
+                                  right: 6,
+                                  bottom: 6,
+                                  child: Container(
+                                    padding: const EdgeInsets.all(3),
+                                    decoration: BoxDecoration(
+                                      color: Colors.black.withAlpha(160),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: const Icon(
+                                      Icons.fullscreen,
+                                      color: Colors.white,
+                                      size: 16,
+                                    ),
                                   ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
-                        ),
-                      );
-                    },
+                        );
+                      },
+                    ),
                   ),
-                ),
                 const SizedBox(height: 16),
 
                 // Videos Section
                 const Text(
-                  'Videos Oficiales y Reseñas',
+                  'Buscar videos y reseñas',
                   style: TextStyle(
                     color: AppTheme.textSecondary,
                     fontSize: 12,
@@ -310,15 +326,18 @@ class _GameMediaGallerySectionState extends State<GameMediaGallerySection> {
               children: [
                 AspectRatio(
                   aspectRatio: 16 / 9,
-                  child: Image.network(
-                    video.thumbnailUrl,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(
-                      color: AppTheme.surfaceSubtle,
-                      child: const Icon(Icons.play_circle_fill,
-                          color: AppTheme.textMuted, size: 36),
-                    ),
-                  ),
+                  child: video.thumbnailUrl.isEmpty
+                      ? const Icon(Icons.play_circle_outline,
+                          color: AppTheme.textMuted)
+                      : Image.network(
+                          video.thumbnailUrl,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Container(
+                            color: AppTheme.surfaceSubtle,
+                            child: const Icon(Icons.play_circle_fill,
+                                color: AppTheme.textMuted, size: 36),
+                          ),
+                        ),
                 ),
                 Container(
                   color: Colors.black.withAlpha(90),
@@ -342,7 +361,8 @@ class _GameMediaGallerySectionState extends State<GameMediaGallerySection> {
                   top: 6,
                   left: 6,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
                     decoration: BoxDecoration(
                       color: Colors.black.withAlpha(180),
                       borderRadius: BorderRadius.circular(4),
@@ -384,7 +404,8 @@ class _GameMediaGallerySectionState extends State<GameMediaGallerySection> {
                   const SizedBox(height: 2),
                   Row(
                     children: [
-                      const Icon(Icons.open_in_new, size: 10, color: AppTheme.textMuted),
+                      const Icon(Icons.open_in_new,
+                          size: 10, color: AppTheme.textMuted),
                       const SizedBox(width: 3),
                       Expanded(
                         child: Text(

@@ -4,6 +4,21 @@ import 'package:dinoxo_gamers/domain/services/ocr_service.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  test('recognizes a title split over three lines on a cover', () async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+            OcrService.channel,
+            (_) async => [
+                  'PS5',
+                  'Ghost of',
+                  'Tsushima',
+                  "DIRECTOR’S CUT",
+                  'MATURE 17+'
+                ]);
+    final titles = await OcrService.recognizeText('/gallery/cover.jpg');
+    expect(titles, contains("Ghost of Tsushima DIRECTOR’S CUT"));
+    expect(titles, isNot(contains('PS5')));
+  });
   tearDown(() => TestDefaultBinaryMessengerBinding
       .instance.defaultBinaryMessenger
       .setMockMethodCallHandler(OcrService.channel, null));

@@ -1,10 +1,12 @@
 import 'dart:convert';
+import 'dart:isolate';
 import 'package:html/parser.dart' as html;
 import 'package:http/http.dart' as http;
 import '../../core/constants/app_constants.dart';
 import '../../domain/models/game.dart';
 import '../../domain/models/game_edition.dart';
 import '../../domain/models/review_snapshot.dart';
+import '../../domain/services/subscription_title.dart';
 
 class CatalogException implements Exception {
   final String message;
@@ -21,14 +23,57 @@ class LiveCatalogPage {
       {this.hasMore = false, this.warnings = const []});
 }
 
+class _ItemTask {
+  const _ItemTask(this.body, this.source, this.checkedAt);
+  final String body;
+  final Uri source;
+  final DateTime checkedAt;
+  List<Game> call() => LiveWebScraperService.parseItem(body, source, checkedAt);
+}
+
+class _ListingTask {
+  const _ListingTask(this.body, this.page);
+  final String body;
+  final int page;
+  ({List<String> paths, bool next}) call() {
+    final doc = html.parse(body);
+    final links = doc
+        .querySelectorAll('a.main-link')
+        .where((a) => a.querySelector('h6') != null)
+        .map((a) => a.attributes['href'] ?? '')
+        .where((p) => p.startsWith('/items/'))
+        .toSet()
+        .toList();
+    if (links.isEmpty && doc.querySelector('form[action="/search"]') == null) {
+      throw const CatalogException(
+          'La estructura de la fuente cambió. No se pudieron leer los juegos.');
+    }
+    final next = doc.querySelectorAll('.pagination li:not(.disabled) a').any(
+        (a) =>
+            (int.tryParse(Uri.tryParse(a.attributes['href'] ?? '')
+                        ?.queryParameters['page'] ??
+                    '') ??
+                0) >
+            page);
+    return (paths: links, next: next);
+  }
+}
+
 /// On-demand public pages. No invented fallbacks, paid API or anti-bot bypass.
 class LiveWebScraperService {
   final http.Client _client;
+  final bool _backgroundParsing;
   final Map<GamePlatform?, Future<String>> _sessions = {};
   LiveWebScraperService({http.Client? client})
-      : _client = client ?? http.Client();
+      : _client = client ?? http.Client(),
+        _backgroundParsing = client == null;
   void close() => _client.close();
   static const host = 'www.dekudeals.com';
+
+  Future<List<Game>> _parseItem(String body, Uri uri) {
+    final task = _ItemTask(body, uri, DateTime.now().toUtc());
+    return _backgroundParsing ? Isolate.run(task.call) : Future.sync(task.call);
+  }
 
   Future<String> _session(GamePlatform? platform) async {
     try {
@@ -136,13 +181,14 @@ class LiveWebScraperService {
           'Este juego no tiene una fuente USA consultable. Búscalo de nuevo.');
     }
     final cookie = await _session(game.platform);
-    final games =
-        parseItem(await _get(uri, cookie), uri, DateTime.now().toUtc())
-            .where((g) => g.platform == game.platform)
-            .toList();
+    final games = (await _parseItem(await _get(uri, cookie), uri))
+        .where((g) =>
+            g.platform == game.platform &&
+            subscriptionTitleKey(g.title) == subscriptionTitleKey(game.title))
+        .toList();
     if (games.isEmpty) {
       throw const CatalogException(
-          'La ficha no contiene datos actuales para esta consola.');
+          'La fuente ya no corresponde a este juego y consola. Búscalo de nuevo.');
     }
     return games;
   }
@@ -160,49 +206,39 @@ class LiveWebScraperService {
       if (query != null) 'q': query,
       'page': '$remotePage'
     });
-    final document = html.parse(await _get(uri, cookie));
-    final links = document
-        .querySelectorAll('a.main-link')
-        .where((a) => a.querySelector('h6') != null)
-        .map((a) => a.attributes['href'] ?? '')
-        .where((p) => p.startsWith('/items/'))
-        .toSet()
-        .toList();
-    if (links.isEmpty &&
-        document.querySelector('form[action="/search"]') == null) {
-      throw const CatalogException(
-          'La estructura de la fuente cambió. No se pudieron leer los juegos.');
-    }
+    final listingTask = _ListingTask(await _get(uri, cookie), remotePage);
+    final listing = await (_backgroundParsing
+        ? Isolate.run(listingTask.call)
+        : Future.sync(listingTask.call));
+    final links = listing.paths;
     final start = ((page - 1) % 6) * batchSize;
     final paths = links.skip(start).take(batchSize).toList();
     final games = <Game>[];
+    final warnings = <String>[];
     for (var offset = 0; offset < paths.length; offset += 2) {
       final groups =
           await Future.wait(paths.skip(offset).take(2).map((itemPath) async {
         final source = Uri.https(host, itemPath, {'country': 'us'});
         try {
-          final parsed = parseItem(
-              await _get(source, cookie), source, DateTime.now().toUtc());
-          return parsed;
-        } catch (_) {
-          return <Game>[];
+          final parsed = await _parseItem(await _get(source, cookie), source);
+          return LiveCatalogPage(parsed, warnings: [
+            if (parsed.isEmpty)
+              'No se pudo verificar la ficha ${source.pathSegments.last}. Los resultados pueden estar incompletos.'
+          ]);
+        } catch (error) {
+          return LiveCatalogPage(const [], warnings: [
+            'No se pudo consultar ${source.pathSegments.last}: $error'
+          ]);
         }
       }));
-      games.addAll(groups.expand((g) => g).where((g) =>
+      warnings.addAll(groups.expand((g) => g.warnings));
+      games.addAll(groups.expand((g) => g.games).where((g) =>
           (platform == null || g.platform == platform) &&
           (!dealsOnly || g.hasDiscount)));
     }
-    final hasNextPage = document
-        .querySelectorAll('.pagination li:not(.disabled) a')
-        .any((a) =>
-            (int.tryParse(Uri.tryParse(a.attributes['href'] ?? '')
-                        ?.queryParameters['page'] ??
-                    '') ??
-                0) >
-            remotePage);
     return LiveCatalogPage(games,
-        hasMore: start + batchSize < links.length || hasNextPage,
-        warnings: const []);
+        hasMore: start + batchSize < links.length || listing.next,
+        warnings: warnings);
   }
 
   static List<Game> parseItem(String text, Uri source, DateTime checkedAt) {
@@ -210,6 +246,9 @@ class LiveWebScraperService {
       return [];
     }
     final doc = html.parse(text);
+    final pageTitle = doc.querySelector('h1, h2.d-inline')?.text.trim() ?? '';
+    final pageKey = subscriptionTitleKey(pageTitle);
+    if (pageKey.isEmpty) return [];
     String metadata(String label) {
       for (final row in doc.querySelectorAll('li.list-group-item')) {
         if (row.querySelector('strong')?.text.trim() == '$label:') {
@@ -301,6 +340,11 @@ class LiveWebScraperService {
         };
         if (!usStore) continue;
         final title = item['item_name'] as String;
+        // Analytics may include sidebar recommendations. Page artwork and
+        // reviews belong only to the product named by the page heading.
+        if (subscriptionTitleKey(title) != pageKey) {
+          continue;
+        }
         final id = 'deku_${match.group(1)}';
         final consoles = (item['item_category'] as String)
             .split('+')
@@ -356,7 +400,7 @@ class LiveWebScraperService {
     final platformRows = doc
         .querySelectorAll('li.list-group-item')
         .where((e) => e.text.trim().startsWith('Platforms:'));
-    final title = doc.querySelector('h1, h2.d-inline')?.text.trim() ?? '';
+    final title = pageTitle;
     final platformText = platformRows.map((e) => e.text).join(' ');
     if (title.isNotEmpty) {
       for (final p in GamePlatform.values) {

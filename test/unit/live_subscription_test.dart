@@ -126,7 +126,7 @@ void main() {
     const xbox =
         '''<rss><channel><item><title>Coming to Xbox Game Pass: Examples</title>
       <link>https://news.xbox.com/en-us/2026/09/15/example/</link>
-      <content:encoded><![CDATA[<strong>Console Game (Console and PC) – October 2</strong>
+      <content:encoded><![CDATA[<h2>Coming Soon</h2><strong>Console Game (Console and PC) – October 2</strong>
       <strong>PC Game (PC) – October 3</strong>]]></content:encoded></item></channel></rss>''';
     expect(
         SubscriptionSource.parseAnnouncements(xbox, GamePlatform.xbox, now)
@@ -191,7 +191,7 @@ void main() {
     const feed =
         '''<rss><channel><item><title>Coming to Xbox Game Pass: Games</title>
     <link>https://news.xbox.com/en-us/2026/12/15/example/</link>
-    <content:encoded><![CDATA[<p><strong>Console Game (Console and PC) – January 2</strong><br>Now with Game Pass Premium; joining Game Pass Ultimate.</p>]]></content:encoded></item></channel></rss>''';
+    <content:encoded><![CDATA[<h2>Coming Soon</h2><p><strong>Console Game (Console and PC) – January 2</strong><br>Now with Game Pass Premium; joining Game Pass Ultimate.</p>]]></content:encoded></item></channel></rss>''';
     final item = SubscriptionSource.parseAnnouncements(
             feed, GamePlatform.xbox, DateTime(2026, 12, 27))
         .single;
