@@ -152,6 +152,10 @@ class GameRepository extends ChangeNotifier {
     return result;
   }
 
+  Future<List<String>> fetchAutocomplete(String query) async {
+    return await _web.fetchAutocomplete(query);
+  }
+
   Future<void> _loadCache() async {
     if (_loadedCache) return;
     final cached = await _localDb.readCatalogSnapshots();

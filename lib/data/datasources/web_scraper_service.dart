@@ -137,6 +137,18 @@ class LiveWebScraperService {
     return text;
   }
 
+  Future<List<String>> fetchAutocomplete(String query) async {
+    try {
+      final uri = Uri.https(host, '/search/autocomplete', {'q': query});
+      final res = await _client.get(uri).timeout(const Duration(seconds: 3));
+      if (res.statusCode == 200) {
+        final list = jsonDecode(res.body) as List;
+        return list.map((e) => e.toString()).toList();
+      }
+    } catch (_) {}
+    return [];
+  }
+
   Future<LiveCatalogPage> fetchLiveDeals(
       {GamePlatform? platform, int page = 1}) async {
     if (platform != null) {

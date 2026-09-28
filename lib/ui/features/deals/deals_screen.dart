@@ -17,6 +17,7 @@ class _DealsScreenState extends State<DealsScreen> {
   GamePlatform? _platform;
   List<Game> _games = [];
   Set<String> _favorites = {};
+  String _searchQuery = '';
   bool _busy = true;
   bool _hasMore = false;
   int _page = 1;
@@ -76,9 +77,13 @@ class _DealsScreenState extends State<DealsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final games = _games
+    var games = _games
         .where((g) => _maxPrice == null || g.currentPrice <= _maxPrice!)
         .toList();
+    if (_searchQuery.isNotEmpty) {
+      final q = _searchQuery.toLowerCase();
+      games = games.where((g) => g.title.toLowerCase().contains(q)).toList();
+    }
     return Scaffold(
         appBar: AppBar(title: const Text('Ofertas Destacadas'), actions: [
           IconButton(
@@ -87,6 +92,44 @@ class _DealsScreenState extends State<DealsScreen> {
               icon: const Icon(Icons.refresh)),
         ]),
         body: Column(children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            child: Autocomplete<String>(
+              optionsBuilder: (textEditingValue) {
+                final query = textEditingValue.text.trim().toLowerCase();
+                if (query.isEmpty) return const Iterable<String>.empty();
+                return _games
+                    .where((g) => g.title.toLowerCase().contains(query))
+                    .map((g) => g.title)
+                    .toSet();
+              },
+              onSelected: (selection) {
+                setState(() => _searchQuery = selection);
+              },
+              fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
+                return TextField(
+                  controller: controller,
+                  focusNode: focusNode,
+                  onChanged: (val) {
+                    setState(() => _searchQuery = val);
+                  },
+                  onSubmitted: (_) {
+                    onFieldSubmitted();
+                  },
+                  textInputAction: TextInputAction.search,
+                  decoration: InputDecoration(
+                      hintText: 'Busca Tu oferta',
+                      prefixIcon: const Icon(Icons.search),
+                      suffixIcon: IconButton(
+                          icon: const Icon(Icons.clear),
+                          onPressed: () {
+                            controller.clear();
+                            setState(() => _searchQuery = '');
+                          })),
+                );
+              },
+            ),
+          ),
           SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.all(12),

@@ -29,6 +29,7 @@ class SearchScreen extends StatefulWidget {
 
 class _SearchScreenState extends State<SearchScreen> {
   final _controller = TextEditingController();
+  TextEditingController? _autoController;
   Timer? _debounce;
   int _generation = 0;
   int _page = 1;
@@ -116,6 +117,7 @@ class _SearchScreenState extends State<SearchScreen> {
         builder: (_) => _PhotoQueryDialog(lines: lines, error: error));
     if (!mounted || query == null) return;
     _controller.text = query;
+    _autoController?.text = query;
     setState(() => _platform = platform);
     await _search(openPhotoMatch: true);
   }
@@ -220,20 +222,42 @@ class _SearchScreenState extends State<SearchScreen> {
         body: Column(children: [
           Padding(
               padding: const EdgeInsets.all(12),
-              child: TextField(
-                controller: _controller,
-                onChanged: _changed,
-                onSubmitted: (_) => _search(),
-                textInputAction: TextInputAction.search,
-                decoration: InputDecoration(
-                    hintText: 'Wolverine, Pokémon, Halo…',
-                    prefixIcon: const Icon(Icons.search),
-                    suffixIcon: IconButton(
-                        icon: const Icon(Icons.clear),
-                        onPressed: () {
-                          _controller.clear();
-                          _changed('');
-                        })),
+              child: Autocomplete<String>(
+                optionsBuilder: (textEditingValue) async {
+                  final query = textEditingValue.text.trim();
+                  if (query.length < 2) return const Iterable<String>.empty();
+                  return await widget.repository.fetchAutocomplete(query);
+                },
+                onSelected: (selection) {
+                  _controller.text = selection;
+                  _search();
+                },
+                fieldViewBuilder: (context, textEditingController, focusNode, onFieldSubmitted) {
+                  _autoController = textEditingController;
+                  return TextField(
+                    controller: textEditingController,
+                    focusNode: focusNode,
+                    onChanged: (value) {
+                      _controller.text = value;
+                      _changed(value);
+                    },
+                    onSubmitted: (_) {
+                      onFieldSubmitted();
+                      _search();
+                    },
+                    textInputAction: TextInputAction.search,
+                    decoration: InputDecoration(
+                        hintText: 'Escribe Tu Juego',
+                        prefixIcon: const Icon(Icons.search),
+                        suffixIcon: IconButton(
+                            icon: const Icon(Icons.clear),
+                            onPressed: () {
+                              textEditingController.clear();
+                              _controller.clear();
+                              _changed('');
+                            })),
+                  );
+                },
               )),
           SingleChildScrollView(
               scrollDirection: Axis.horizontal,
