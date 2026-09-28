@@ -113,14 +113,9 @@ class _SearchScreenState extends State<SearchScreen> {
     if (!mounted) return;
     setState(() => _readingPhoto = false);
 
-    String? query;
-    if (error == null && lines.isNotEmpty) {
-      query = lines.first;
-    } else {
-      query = await showDialog<String>(
-          context: context,
-          builder: (_) => _PhotoQueryDialog(lines: lines, error: error));
-    }
+    final query = await showDialog<String>(
+        context: context,
+        builder: (_) => _PhotoQueryDialog(lines: lines, error: error));
 
     if (!mounted || query == null || query.trim().isEmpty) return;
     _controller.text = query.trim();
