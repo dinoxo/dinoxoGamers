@@ -1,3 +1,13 @@
+## [1.7.0+8] - 2026-09-28
+
+### Corregido
+- Corregido el error IMAGE_INVALID que ocurría al analizar fotos tomadas o de la galería. Se cambió el acceso a los archivos para utilizar flujos directos en lugar de intentar forzar URLs de sistema, permitiendo que la foto se lea perfectamente.
+- Reducción extrema de la presión de memoria y picos de recolección de basura (Garbage Collection) durante la consulta de juegos del catálogo de Nintendo Switch (Plus). Se reemplazaron algoritmos de parseo web pesados por expresiones regulares ligeras, solucionando problemas de "app congelada" o retardos de varios segundos en esa sección.
+- El análisis de la cámara ahora omite la pantalla intermedia ("Confirma el título") y salta directamente a la búsqueda en la web si el escáner (OCR) detectó el nombre del juego con éxito y certeza. La pantalla de corrección manual solo aparecerá como respaldo si la foto es muy borrosa o ilegible.
+
+### Añadido
+- **Autocompletado predictivo en buscador:** La barra de "Escribe Tu Juego" ahora sugiere juegos instantáneamente (como Mario Kart, Super Mario Galaxy) al escribir 2 o más letras, gracias a una conexión nativa con la API en vivo.
+- **Buscador en Ofertas:** Se agregó una barra inteligente de búsqueda ("Busca Tu oferta") sobre los filtros de plataformas. Este buscador filtra y localiza en tiempo real únicamente los títulos que estén descontados dentro de esa categoría.
 # Changelog - Dinoxo Gamers
 
 Todas las modificaciones notables de este proyecto se documentan en este archivo.
@@ -148,3 +158,4 @@ Todas las modificaciones notables de este proyecto se documentan en este archivo
   - Script de compilaciÃ³n reproducible `compile_apk.ps1` ejecutado en contenedor Docker.
   - Archivo `.env.example` con variables pÃºblicas sin credenciales sensibles.
   - Suite de pruebas unitarias y de widgets con 100% de aprobados y 0 advertencias de anÃ¡lisis estÃ¡tico.
+

@@ -112,12 +112,19 @@ class _SearchScreenState extends State<SearchScreen> {
       {String? error, GamePlatform? platform}) async {
     if (!mounted) return;
     setState(() => _readingPhoto = false);
-    final query = await showDialog<String>(
-        context: context,
-        builder: (_) => _PhotoQueryDialog(lines: lines, error: error));
-    if (!mounted || query == null) return;
-    _controller.text = query;
-    _autoController?.text = query;
+
+    String? query;
+    if (error == null && lines.isNotEmpty) {
+      query = lines.first;
+    } else {
+      query = await showDialog<String>(
+          context: context,
+          builder: (_) => _PhotoQueryDialog(lines: lines, error: error));
+    }
+
+    if (!mounted || query == null || query.trim().isEmpty) return;
+    _controller.text = query.trim();
+    _autoController?.text = query.trim();
     setState(() => _platform = platform);
     await _search(openPhotoMatch: true);
   }

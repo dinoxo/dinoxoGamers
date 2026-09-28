@@ -49,9 +49,7 @@ class PhotoTextReader(private val context: Context) {
             var recognizer: com.google.mlkit.vision.text.TextRecognizer? = null
             try {
                 if (read.cancelled.get()) { release(read); return@execute }
-                val uri = if (path.startsWith("content://") || path.startsWith("file://"))
-                    Uri.parse(path) else Uri.fromFile(File(path))
-                bitmap = decode(uri)
+                bitmap = decode(path)
                 if (read.cancelled.get()) {
                     bitmap.recycle(); release(read); return@execute
                 }
@@ -91,7 +89,7 @@ class PhotoTextReader(private val context: Context) {
                 bitmap?.recycle(); recognizer?.close()
                 error(read, "photo_access_denied", "No se permitió leer esta foto.")
                 release(read)
-            } catch (_: Exception) {
+            } catch (e: Exception) { android.util.Log.e("OCR", "Decode failed", e)
                 bitmap?.recycle(); recognizer?.close()
                 error(read, "IMAGE_INVALID", "No se pudo abrir el formato de imagen.")
                 release(read)
@@ -99,23 +97,29 @@ class PhotoTextReader(private val context: Context) {
         }
     }
 
-    private fun decode(uri: Uri): Bitmap {
+    private fun getStream(path: String): java.io.InputStream {
+        return if (path.startsWith("content://") || path.startsWith("file://")) {
+            context.contentResolver.openInputStream(Uri.parse(path))
+                ?: throw IllegalArgumentException("Cannot open stream for URI")
+        } else {
+            java.io.FileInputStream(java.io.File(path))
+        }
+    }
+
+    private fun decode(path: String): Bitmap {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        context.contentResolver.openInputStream(uri).use { stream ->
-            requireNotNull(stream)
+        getStream(path).use { stream ->
             BitmapFactory.decodeStream(stream, null, bounds)
         }
         val sample = PhotoImageBudget.sampleSize(bounds.outWidth, bounds.outHeight)
-        val orientation = context.contentResolver.openInputStream(uri).use { stream ->
-            requireNotNull(stream)
+        val orientation = getStream(path).use { stream ->
             ExifInterface(stream).getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)
         }
         val options = BitmapFactory.Options().apply {
             inSampleSize = sample
             inPreferredConfig = Bitmap.Config.ARGB_8888
         }
-        val original = context.contentResolver.openInputStream(uri).use { stream ->
-            requireNotNull(stream)
+        val original = getStream(path).use { stream ->
             requireNotNull(BitmapFactory.decodeStream(stream, null, options))
         }
         val transform = Matrix()
