@@ -92,6 +92,37 @@ void main() {
       expect(estimation.estimatedWindow, isNotNull);
       expect(estimation.confidence, isNotNull);
       expect(estimation.reason.contains('rebajas previas'), true);
+      expect(estimation.estimatedPrice, isNotNull);
+    });
+
+    test('allowMarketProjection predicts next price value and seasonal window when observations are empty', () {
+      final estimation = PriceEstimatorService.estimateNextSale(
+        observations: [],
+        regularPrice: 59.99,
+        allowMarketProjection: true,
+      );
+
+      expect(estimation.hasEnoughData, true);
+      expect(estimation.estimatedPrice, isNotNull);
+      expect(estimation.estimatedPrice!, lessThan(59.99));
+      expect(estimation.estimatedWindow, isNotNull);
+      expect(estimation.campaignName, isNotNull);
+      expect(estimation.isAlgorithmicProjection, true);
+      expect(estimation.reason, contains('Análisis predictivo de Dinoxo Gamers'));
+    });
+
+    test('allowMarketProjection projects to providerReportedLowest if available', () {
+      final estimation = PriceEstimatorService.estimateNextSale(
+        observations: [],
+        regularPrice: 69.99,
+        providerReportedLowest: 29.99,
+        allowMarketProjection: true,
+      );
+
+      expect(estimation.hasEnoughData, true);
+      expect(estimation.estimatedPrice, 29.99);
+      expect(estimation.estimatedDiscountPercent, greaterThan(50));
+      expect(estimation.isAlgorithmicProjection, true);
     });
   });
 }

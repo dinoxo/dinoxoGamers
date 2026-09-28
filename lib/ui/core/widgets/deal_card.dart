@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/date_formatter.dart';
 import '../../../domain/models/game.dart';
+import '../../../domain/services/subscription_service.dart';
 import 'platform_badge.dart';
 import 'price_tag.dart';
 import 'usa_badge.dart';
@@ -111,6 +112,62 @@ class DealCard extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 6),
+
+                    // Subscription recommendation / status
+                    Builder(builder: (context) {
+                      final subMatch = SubscriptionService.instance
+                          .checkGame(game.title, platform: game.platform);
+                      if (subMatch == null) return const SizedBox.shrink();
+
+                      Color chipColor;
+                      IconData chipIcon;
+                      String chipText;
+
+                      if (subMatch.isLeavingSoon) {
+                        chipColor = AppTheme.warning;
+                        chipIcon = Icons.hourglass_bottom_rounded;
+                        chipText = 'Sale pronto de ${subMatch.item.shortBadgeLabel}';
+                      } else if (subMatch.isComingSoon) {
+                        chipColor = const Color(0xFF00C3FF);
+                        chipIcon = Icons.upcoming_rounded;
+                        chipText = 'Pronto en ${subMatch.item.shortBadgeLabel}';
+                      } else {
+                        chipColor = AppTheme.success;
+                        chipIcon = Icons.card_membership_rounded;
+                        chipText = 'En ${subMatch.item.shortBadgeLabel} · No compres';
+                      }
+
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 6),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: chipColor.withAlpha(25),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(
+                              color: chipColor.withAlpha(100), width: 0.9),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(chipIcon, size: 12, color: chipColor),
+                            const SizedBox(width: 4),
+                            Flexible(
+                              child: Text(
+                                chipText,
+                                style: TextStyle(
+                                  color: chipColor,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }),
 
                     // Promo Ending notice
                     if (promoEnd != null) ...[

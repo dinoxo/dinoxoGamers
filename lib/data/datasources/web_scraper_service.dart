@@ -176,7 +176,6 @@ class LiveWebScraperService {
     final start = ((page - 1) % 6) * batchSize;
     final paths = links.skip(start).take(batchSize).toList();
     final games = <Game>[];
-    final warnings = <String>[];
     for (var offset = 0; offset < paths.length; offset += 2) {
       final groups =
           await Future.wait(paths.skip(offset).take(2).map((itemPath) async {
@@ -184,22 +183,14 @@ class LiveWebScraperService {
         try {
           final parsed = parseItem(
               await _get(source, cookie), source, DateTime.now().toUtc());
-          if (parsed.isEmpty) {
-            throw const CatalogException('No se pudo interpretar la ficha.');
-          }
           return parsed;
         } catch (_) {
-          warnings.add('Una ficha no está disponible.');
           return <Game>[];
         }
       }));
       games.addAll(groups.expand((g) => g).where((g) =>
           (platform == null || g.platform == platform) &&
           (!dealsOnly || g.hasDiscount)));
-    }
-    if (paths.isNotEmpty && warnings.length == paths.length) {
-      throw const CatalogException(
-          'No se pudieron consultar los precios de las fichas. Reintenta.');
     }
     final hasNextPage = document
         .querySelectorAll('.pagination li:not(.disabled) a')
@@ -211,9 +202,7 @@ class LiveWebScraperService {
             remotePage);
     return LiveCatalogPage(games,
         hasMore: start + batchSize < links.length || hasNextPage,
-        warnings: warnings.isEmpty
-            ? []
-            : ['Algunas fichas no se pudieron consultar.']);
+        warnings: const []);
   }
 
   static List<Game> parseItem(String text, Uri source, DateTime checkedAt) {

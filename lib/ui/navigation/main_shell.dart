@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_theme.dart';
 import '../../data/repositories/game_repository.dart';
+import '../../domain/services/notification_service.dart';
 import '../core/widgets/usa_badge.dart';
 import '../features/alerts/alerts_screen.dart';
 import '../features/deals/deals_screen.dart';
 import '../features/library/library_screen.dart';
 import '../features/search/search_screen.dart';
 import '../features/store/dinoxo_store_screen.dart';
+import '../features/subscriptions/plus_screen.dart';
 
 class MainShell extends StatefulWidget {
   final GameRepository repository;
@@ -31,9 +34,173 @@ class _MainShellState extends State<MainShell> {
     _screens = [
       DealsScreen(repository: widget.repository),
       SearchScreen(repository: widget.repository),
+      const PlusScreen(),
       AlertsScreen(repository: widget.repository),
       const DinoxoStoreScreen(),
     ];
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkFirstRunPermissions();
+    });
+  }
+
+  Future<void> _checkFirstRunPermissions() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final hasSeenNotice =
+          prefs.getBool('has_seen_permissions_notice') ?? false;
+      if (!hasSeenNotice && mounted) {
+        _showPermissionsNoticeDialog(prefs);
+      }
+    } catch (_) {}
+  }
+
+  void _showPermissionsNoticeDialog(SharedPreferences prefs) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppTheme.surfaceElevated,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: const Row(
+          children: [
+            Icon(Icons.security_outlined, color: AppTheme.primaryLight, size: 24),
+            SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Permisos en Dinoxo Gamers',
+                style: TextStyle(
+                  color: AppTheme.textPrimary,
+                  fontSize: 17,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Para brindarte la mejor experiencia al seguir ofertas y precios en tiempo real, la app puede requerir los siguientes permisos:',
+              style: TextStyle(
+                color: AppTheme.textSecondary,
+                fontSize: 12.5,
+                height: 1.35,
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Permiso 1: Notificaciones
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppTheme.surfaceSubtle,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: AppTheme.border),
+              ),
+              child: const Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.notifications_active_outlined,
+                      color: AppTheme.primaryLight, size: 22),
+                  SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Notificaciones (Recomendado)',
+                          style: TextStyle(
+                            color: AppTheme.textPrimary,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 12.5,
+                          ),
+                        ),
+                        SizedBox(height: 3),
+                        Text(
+                          'Te avisará en tiempo real cuando un juego que sigas en Mis Alertas baje de precio o alcance tu valor deseado.',
+                          style: TextStyle(
+                            color: AppTheme.textMuted,
+                            fontSize: 11,
+                            height: 1.3,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 10),
+
+            // Permiso 2: Cámara
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppTheme.surfaceSubtle,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: AppTheme.border),
+              ),
+              child: const Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.camera_alt_outlined,
+                      color: AppTheme.secondary, size: 22),
+                  SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Cámara y Fotos (Opcional)',
+                          style: TextStyle(
+                            color: AppTheme.textPrimary,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 12.5,
+                          ),
+                        ),
+                        SizedBox(height: 3),
+                        Text(
+                          'Se utiliza para escanear etiquetas de precios físicos mediante OCR y comprobar si conviene comprar en digital.',
+                          style: TextStyle(
+                            color: AppTheme.textMuted,
+                            fontSize: 11,
+                            height: 1.3,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () async {
+              await prefs.setBool('has_seen_permissions_notice', true);
+              if (ctx.mounted) Navigator.pop(ctx);
+            },
+            child: const Text('Más tarde',
+                style: TextStyle(color: AppTheme.textMuted)),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              await prefs.setBool('has_seen_permissions_notice', true);
+              if (ctx.mounted) Navigator.pop(ctx);
+              await NotificationService.instance.requestPermission();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primary,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Activar y Continuar'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showInfoDialog() {
@@ -174,6 +341,7 @@ class _MainShellState extends State<MainShell> {
       ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
+        type: BottomNavigationBarType.fixed,
         onTap: (index) => setState(() => _currentIndex = index),
         items: const [
           BottomNavigationBarItem(
@@ -185,6 +353,11 @@ class _MainShellState extends State<MainShell> {
             icon: Icon(Icons.search),
             activeIcon: Icon(Icons.search),
             label: 'Buscar',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.card_membership_outlined),
+            activeIcon: Icon(Icons.card_membership_rounded),
+            label: 'Plus',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.notifications_none),

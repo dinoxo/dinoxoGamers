@@ -4,11 +4,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:dinoxo_gamers/main.dart';
 import '../fixtures/test_repository.dart';
 import '../fixtures/prepare_brand_image.dart';
 
 void main() {
+  setUp(() {
+    SharedPreferences.setMockInitialValues({'has_seen_permissions_notice': true});
+  });
   Future<void> capture(WidgetTester tester, String name) async {
     if (!const bool.fromEnvironment('SAVE_BRAND_PREVIEW')) return;
     final boundary = tester.renderObject<RenderRepaintBoundary>(

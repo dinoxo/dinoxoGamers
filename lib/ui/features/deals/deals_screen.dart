@@ -128,7 +128,7 @@ class _DealsScreenState extends State<DealsScreen> {
           if (_busy) const LinearProgressIndicator(),
           if (_error != null)
             Padding(padding: const EdgeInsets.all(12), child: Text(_error!)),
-          if (_warning != null)
+          if (_warning != null && _games.isEmpty)
             Padding(padding: const EdgeInsets.all(8), child: Text(_warning!)),
           Expanded(
               child: RefreshIndicator(
