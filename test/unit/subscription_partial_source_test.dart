@@ -8,6 +8,58 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 
 void main() {
+  test('Nintendo benefits remain available when its game source is unavailable',
+      () async {
+    final source = SubscriptionSource(client: MockClient((request) async {
+      if (request.url.toString() == MembershipBenefitsSource.nintendoUrl) {
+        return http.Response(
+            '<main><h2>Play with friends online</h2></main>', 200);
+      }
+      return http.Response('Maintenance', 503);
+    }));
+    addTearDown(source.close);
+    final catalog =
+        await source.fetchCatalog(GamePlatform.nintendo, DateTime(2026, 9, 28));
+    expect(catalog.gamesVerified, false);
+    expect(catalog.items, isEmpty);
+    expect(catalog.benefits.single.tier, SubscriptionTier.nsoStandard);
+  });
+  test('PS one unavailable category does not erase the other verified plans',
+      () async {
+    final source = SubscriptionSource(client: MockClient((request) async {
+      if (request.url.queryParameters['categoryList'] == 'plus-classics-list') {
+        return http.Response('Maintenance', 503);
+      }
+      if (request.url.path == '/bin/imagic/gameslist') {
+        return http.Response(
+            jsonEncode([
+              {
+                'games': [
+                  {
+                    'name': 'Verified',
+                    'device': ['PS5'],
+                    'productId': 'a',
+                    'conceptUrl':
+                        'https://store.playstation.com/en-us/concept/a'
+                  }
+                ]
+              }
+            ]),
+            200);
+      }
+      if (request.url.path.endsWith('/feed/')) {
+        return http.Response('<rss><channel></channel></rss>', 200);
+      }
+      return http.Response('', 200);
+    }));
+    addTearDown(source.close);
+    final catalog = await source.fetchCatalog(
+        GamePlatform.playstation, DateTime(2026, 9, 28));
+    expect(catalog.items, isNotEmpty);
+    expect(
+        catalog.items.any((i) => i.tier == SubscriptionTier.psPremium), false);
+    expect(catalog.notices, isNotEmpty);
+  });
   final now = DateTime(2026, 9, 28);
   Future<void> checkFeed(String feed, {required bool warned}) async {
     final source = SubscriptionSource(client: MockClient((request) async {

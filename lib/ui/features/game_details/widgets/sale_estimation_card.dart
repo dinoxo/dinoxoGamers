@@ -32,32 +32,35 @@ class SaleEstimationCard extends StatelessWidget {
         color: AppTheme.surfaceElevated,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: estimation.hasEnoughData ? AppTheme.primary.withAlpha(80) : AppTheme.border,
+          color: estimation.hasEnoughData
+              ? AppTheme.primary.withAlpha(80)
+              : AppTheme.border,
           width: 1,
         ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
+          Wrap(
+            spacing: 6,
+            runSpacing: 8,
             children: [
-              const Icon(Icons.auto_awesome, size: 16, color: AppTheme.secondary),
+              const Icon(Icons.auto_awesome,
+                  size: 16, color: AppTheme.secondary),
               const SizedBox(width: 6),
-              const Expanded(
-                child: Text(
-                  'Estimación de Próxima Rebaja',
-                  style: TextStyle(
-                    color: AppTheme.textPrimary,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w800,
-                  ),
-                  overflow: TextOverflow.ellipsis,
+              const Text(
+                'Estimación de Próxima Rebaja',
+                style: TextStyle(
+                  color: AppTheme.textPrimary,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
                 ),
               ),
               const SizedBox(width: 8),
               if (estimation.hasEnoughData)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                   decoration: BoxDecoration(
                     color: confidenceColor.withAlpha(30),
                     borderRadius: BorderRadius.circular(4),
@@ -74,7 +77,8 @@ class SaleEstimationCard extends StatelessWidget {
                 )
               else
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                   decoration: BoxDecoration(
                     color: AppTheme.surfaceSubtle,
                     borderRadius: BorderRadius.circular(4),
@@ -101,57 +105,58 @@ class SaleEstimationCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(color: AppTheme.border),
                 ),
-                child: Row(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Icon(Icons.price_check_rounded,
                         color: AppTheme.success, size: 24),
                     const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Precio Proyectado:',
-                            style: TextStyle(
-                              color: AppTheme.textSecondary,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w500,
-                            ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Precio Proyectado:',
+                          style: TextStyle(
+                            color: AppTheme.textSecondary,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
                           ),
-                          Row(
-                            children: [
-                              Text(
-                                '\$${estimation.estimatedPrice!.toStringAsFixed(2)} USD',
-                                style: const TextStyle(
-                                  color: AppTheme.success,
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w900,
+                        ),
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 6,
+                          children: [
+                            Text(
+                              '\$${estimation.estimatedPrice!.toStringAsFixed(2)} USD',
+                              style: const TextStyle(
+                                color: AppTheme.success,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                            if (estimation.estimatedDiscountPercent != null &&
+                                estimation.estimatedDiscountPercent! > 0) ...[
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.success.withAlpha(30),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  '-${estimation.estimatedDiscountPercent}%',
+                                  style: const TextStyle(
+                                    color: AppTheme.success,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w800,
+                                  ),
                                 ),
                               ),
-                              if (estimation.estimatedDiscountPercent != null &&
-                                  estimation.estimatedDiscountPercent! > 0) ...[
-                                const SizedBox(width: 6),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 6, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: AppTheme.success.withAlpha(30),
-                                    borderRadius: BorderRadius.circular(4),
-                                  ),
-                                  child: Text(
-                                    '-${estimation.estimatedDiscountPercent}%',
-                                    style: const TextStyle(
-                                      color: AppTheme.success,
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w800,
-                                    ),
-                                  ),
-                                ),
-                              ],
                             ],
-                          ),
-                        ],
-                      ),
+                          ],
+                        ),
+                      ],
                     ),
                     if (estimation.campaignName != null)
                       Container(

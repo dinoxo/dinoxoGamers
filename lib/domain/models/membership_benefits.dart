@@ -14,8 +14,12 @@ class MembershipBenefits {
 
 class SubscriptionCatalog {
   const SubscriptionCatalog(
-      {required this.items, this.benefits = const [], this.notices = const []});
+      {required this.items,
+      this.benefits = const [],
+      this.notices = const [],
+      this.gamesVerified = true});
   final List<SubscriptionItem> items;
   final List<MembershipBenefits> benefits;
   final List<String> notices;
+  final bool gamesVerified;
 }

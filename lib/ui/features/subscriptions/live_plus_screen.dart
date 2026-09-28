@@ -6,7 +6,6 @@ import '../../../core/utils/date_formatter.dart';
 import '../../../domain/models/subscription_item.dart';
 import '../../../domain/models/membership_benefits.dart';
 import '../../../domain/services/subscription_service.dart';
-import '../../../domain/services/whatsapp_service.dart';
 
 class PlusScreen extends StatefulWidget {
   const PlusScreen({super.key, this.service, this.autoLoad = true});
@@ -106,8 +105,16 @@ class _PlusScreenState extends State<PlusScreen> {
                                         'Nintendo Switch Online',
                                     }),
                               selected: _platform == platform,
-                              onSelected: (_) =>
-                                  setState(() => _platform = platform))),
+                              selectedColor: platform == null
+                                  ? null
+                                  : AppTheme.platformColor(platform)
+                                      .withAlpha(55),
+                              onSelected: (_) => setState(() {
+                                    _platform = platform;
+                                    _category = platform == null
+                                        ? SubscriptionCategory.all
+                                        : SubscriptionCategory.benefits;
+                                  }))),
                   ])),
               SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
@@ -155,7 +162,7 @@ class _PlusScreenState extends State<PlusScreen> {
                                           padding:
                                               const EdgeInsets.only(bottom: 8),
                                           child: Text(
-                                              '${AppConstants.platformDisplayName(platform)} · verificado ${DateFormatter.formatShortDate(service.checkedAt[platform]!)}',
+                                              '${AppConstants.platformDisplayName(platform)} · última consulta ${DateFormatter.formatShortDate(service.checkedAt[platform]!)}',
                                               style: const TextStyle(
                                                   fontSize: 11,
                                                   color: AppTheme.textMuted))),
@@ -178,12 +185,20 @@ class _PlusScreenState extends State<PlusScreen> {
                                 ]);
                           }
                           if (showBenefits) {
-                            return _BenefitsCard(plan: benefits[index - 1]);
+                            return _BenefitsCard(
+                                plan: benefits[index - 1],
+                                onOpen: () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute<void>(
+                                        builder: (_) => _MembershipScreen(
+                                            plan: benefits[index - 1],
+                                            service: service))));
                           }
                           final item = items[index - 1];
                           return _SubscriptionCard(
                               key: ValueKey(item.id),
                               item: item,
+                              stale: service.errors.containsKey(item.platform),
                               now: service.now);
                         },
                       ))),
@@ -194,14 +209,19 @@ class _PlusScreenState extends State<PlusScreen> {
 }
 
 class _SubscriptionCard extends StatelessWidget {
-  const _SubscriptionCard({super.key, required this.item, required this.now});
+  const _SubscriptionCard(
+      {super.key, required this.item, required this.now, this.stale = false});
   final SubscriptionItem item;
   final DateTime now;
+  final bool stale;
   @override
   Widget build(BuildContext context) {
     final cover = item.coverUrl;
     final included = item.availableAt(now);
     return Card(
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: BorderSide(color: AppTheme.platformColor(item.platform))),
         child: Padding(
             padding: const EdgeInsets.all(12),
             child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -232,13 +252,15 @@ class _SubscriptionCard extends StatelessWidget {
                     Text(item.consoles.join(' / '),
                         style: const TextStyle(fontSize: 11)),
                     Text(
-                        item.status == SubscriptionStatus.leavingSoon
-                            ? 'Sale próximamente del catálogo'
-                            : included
-                                ? 'Disponible ahora'
-                                : item.addedAt?.isAfter(now) == true
-                                    ? 'Anunciado; aún no disponible'
-                                    : 'Alta del mes; verifica el acceso actual',
+                        stale
+                            ? 'Última consulta guardada · Pendiente de verificar'
+                            : item.status == SubscriptionStatus.leavingSoon
+                                ? 'Sale próximamente del catálogo'
+                                : included
+                                    ? 'Disponible ahora'
+                                    : item.addedAt?.isAfter(now) == true
+                                        ? 'Anunciado; aún no disponible'
+                                        : 'Alta del mes; verifica el acceso actual',
                         style: TextStyle(
                             fontSize: 12,
                             color: item.status == SubscriptionStatus.leavingSoon
@@ -259,27 +281,55 @@ class _SubscriptionCard extends StatelessWidget {
                           style: const TextStyle(
                               fontSize: 11, color: AppTheme.textSecondary)),
                     TextButton.icon(
-                        onPressed: () =>
-                            WhatsAppService.launchExternalUrl(item.sourceUrl),
-                        icon: const Icon(Icons.open_in_new, size: 14),
-                        label: const Text('Fuente oficial USA')),
+                        onPressed: () => showModalBottomSheet<void>(
+                            context: context,
+                            isScrollControlled: true,
+                            builder: (_) => SafeArea(
+                                child: SingleChildScrollView(
+                                    padding: const EdgeInsets.all(20),
+                                    child: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(item.title,
+                                              style: Theme.of(context)
+                                                  .textTheme
+                                                  .titleLarge),
+                                          const SizedBox(height: 12),
+                                          Text(item.tier.displayName),
+                                          Text(item.consoles.join(' / ')),
+                                          Text(stale
+                                              ? 'La disponibilidad está pendiente de actualizar.'
+                                              : item.statusNote ??
+                                                  'Incluido durante la membresía activa.'),
+                                          const SizedBox(height: 16),
+                                          const Text(
+                                              'Fuente de la consulta · Estados Unidos'),
+                                          SelectableText(item.sourceUrl),
+                                        ])))),
+                        icon: const Icon(Icons.info_outline, size: 14),
+                        label: const Text('Ver detalles')),
                   ])),
             ])));
   }
 }
 
 class _BenefitsCard extends StatelessWidget {
-  const _BenefitsCard({required this.plan});
+  const _BenefitsCard({required this.plan, required this.onOpen});
   final MembershipBenefits plan;
+  final VoidCallback onOpen;
   @override
   Widget build(BuildContext context) => Card(
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(color: AppTheme.platformColor(plan.tier.platform))),
       child: Padding(
           padding: const EdgeInsets.all(14),
           child:
               Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(plan.tier.displayName,
-                style: const TextStyle(
-                    fontWeight: FontWeight.bold, color: AppTheme.primaryLight)),
+                style: const TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             for (final feature in plan.features)
               Padding(
@@ -293,9 +343,126 @@ class _BenefitsCard extends StatelessWidget {
                 'La disponibilidad y los requisitos varían por juego, consola y plan.',
                 style: TextStyle(fontSize: 11, color: AppTheme.textMuted)),
             TextButton.icon(
-                onPressed: () =>
-                    WhatsAppService.launchExternalUrl(plan.sourceUrl),
-                icon: const Icon(Icons.open_in_new, size: 14),
-                label: const Text('Ver beneficios y condiciones oficiales')),
+                onPressed: onOpen,
+                icon: const Icon(Icons.library_books, size: 14),
+                label: const Text('Ver membresía')),
           ])));
+}
+
+class _MembershipScreen extends StatefulWidget {
+  const _MembershipScreen({required this.plan, required this.service});
+  final MembershipBenefits plan;
+  final SubscriptionService service;
+  @override
+  State<_MembershipScreen> createState() => _MembershipScreenState();
+}
+
+class _MembershipScreenState extends State<_MembershipScreen> {
+  String? _console;
+  String _query = '';
+  @override
+  Widget build(BuildContext context) => ListenableBuilder(
+      listenable: widget.service,
+      builder: (context, _) {
+        final tier = widget.plan.tier;
+        final plans = widget.service.getBenefits(platform: tier.platform);
+        final plan =
+            plans.where((p) => p.tier == tier).firstOrNull ?? widget.plan;
+        final features = <String>{
+          if (tier.platform == GamePlatform.nintendo)
+            for (final includedPlan
+                in plans.where((p) => p.tier.rank < tier.rank))
+              ...includedPlan.features,
+          ...plan.features,
+        };
+        final all = widget.service
+            .getItems(platform: tier.platform)
+            .where((i) => i.tier.rank <= tier.rank)
+            .toList();
+        final consoles = all.expand((i) => i.consoles).toSet().toList()..sort();
+        final items = all
+            .where((i) =>
+                (_console == null || i.consoles.contains(_console)) &&
+                i.title.toLowerCase().contains(_query.toLowerCase()))
+            .toList();
+        return Scaffold(
+            appBar: AppBar(
+                title: Text(tier.displayName),
+                backgroundColor: AppTheme.platformColor(tier.platform)),
+            body: Column(children: [
+              Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: TextField(
+                      onChanged: (v) => setState(() => _query = v),
+                      decoration: const InputDecoration(
+                          labelText: 'Buscar juego en esta membresía',
+                          prefixIcon: Icon(Icons.search)))),
+              SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: Row(children: [
+                    Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: ChoiceChip(
+                            label: const Text('Todas las consolas'),
+                            selected: _console == null,
+                            onSelected: (_) =>
+                                setState(() => _console = null))),
+                    for (final console in consoles)
+                      Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: ChoiceChip(
+                              label: Text(console),
+                              selected: _console == console,
+                              onSelected: (_) =>
+                                  setState(() => _console = console))),
+                  ])),
+              Expanded(
+                  child: ListView.builder(
+                      padding: const EdgeInsets.all(12),
+                      itemCount: items.length + 1,
+                      itemBuilder: (context, index) {
+                        if (index == 0) {
+                          return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                if (widget.service.errors[tier.platform] !=
+                                    null)
+                                  Text(widget.service.errors[tier.platform]!,
+                                      style: const TextStyle(
+                                          color: AppTheme.warning)),
+                                ExpansionTile(
+                                    title: const Text('Beneficios y DLC'),
+                                    children: [
+                                      for (final feature in features)
+                                        ListTile(
+                                            dense: true, title: Text(feature)),
+                                      Padding(
+                                          padding: const EdgeInsets.all(12),
+                                          child: SelectableText(plan.sourceUrl))
+                                    ]),
+                                const SizedBox(height: 12),
+                                Text('Juegos incluidos',
+                                    style:
+                                        Theme.of(context).textTheme.titleLarge),
+                                Text(
+                                    '${items.length} entradas · Acceso con membresía activa'),
+                                if (tier.platform == GamePlatform.nintendo)
+                                  const Text(
+                                      'Los clásicos se juegan mediante las aplicaciones Nintendo Classics de cada consola. GameCube requiere Switch 2. Los DLC requieren el juego base.'),
+                                if (items.isEmpty)
+                                  const Padding(
+                                      padding: EdgeInsets.all(16),
+                                      child: Text(
+                                          'No hay juegos disponibles para estos filtros.')),
+                              ]);
+                        }
+                        return _SubscriptionCard(
+                            item: items[index - 1],
+                            now: widget.service.now,
+                            stale: widget.service.errors
+                                .containsKey(tier.platform));
+                      })),
+            ]));
+      });
 }

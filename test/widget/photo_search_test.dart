@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -26,6 +27,45 @@ class _Repo extends TestRepository {
 
 void main() {
   setUpAll(() => initializeDateFormatting('es'));
+  testWidgets('a picker result after leaving the screen never starts OCR',
+      (tester) async {
+    final photo = Completer<XFile?>();
+    var reads = 0;
+    await tester.pumpWidget(MaterialApp(
+        home: SearchScreen(
+            repository: _Repo(),
+            pickPhoto: (_) => photo.future,
+            readPhoto: (_) async {
+              reads++;
+              return ['Halo'];
+            })));
+    await tester.tap(find.byTooltip('Leer título de una imagen'));
+    await tester.pumpWidget(const MaterialApp(home: SizedBox()));
+    photo.complete(XFile('/gallery/late.jpg'));
+    await tester.pumpAndSettle();
+    expect(reads, 0);
+    expect(tester.takeException(), isNull);
+  });
+  testWidgets('rapid photo requests keep only one picker selection active',
+      (tester) async {
+    final photo = Completer<XFile?>();
+    var selections = 0;
+    await tester.pumpWidget(MaterialApp(
+        home: SearchScreen(
+            repository: _Repo(),
+            pickPhoto: (_) {
+              selections++;
+              return photo.future;
+            })));
+    final gallery = tester.widget<IconButton>(find.byWidgetPredicate((widget) =>
+        widget is IconButton && widget.tooltip == 'Leer título de una imagen'));
+    gallery.onPressed!();
+    gallery.onPressed!();
+    expect(selections, 1);
+    photo.complete(null);
+    await tester.pumpAndSettle();
+    expect(find.text('Confirma el título'), findsNothing);
+  });
   testWidgets('a failed edition prevents automatic photo navigation',
       (tester) async {
     final repo = _Repo()

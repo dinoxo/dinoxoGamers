@@ -2,6 +2,23 @@
 
 Todas las modificaciones notables de este proyecto se documentan en este archivo.
 
+## [1.6.0+7] - 2026-09-28
+
+### Corregido
+- Plus procesa cada consulta completa (descarga, decodificación y catálogo) fuera del hilo de la interfaz, con un límite que termina la tarea bloqueada. Las compañías se actualizan de forma progresiva y se evitan reintentos automáticos continuos.
+- Los fallos parciales conservan las listas y planes comprobados. Si falla una actualización completa, se mantiene la consulta anterior durante la sesión, marcada pendiente; no genera consejos de compra como si estuviera recién verificada.
+- Las membresías se abren dentro de la app. Nintendo muestra beneficios, DLC, bibliotecas por consola y juegos para miembros obtenidos de su web USA, con búsqueda por plan. No abre el navegador al consultar estas tarjetas.
+- Fotos: decodificación con límite de 3 millones de píxeles y lado máximo de 2048, orientación EXIF, una lectura simultánea, cancelación y recuperación segura al volver del selector. No se carga primero la foto completa para reducirla.
+- PlayStation azul, Nintendo rojo y Xbox verde en tarjetas, búsqueda por marca y fichas. Portadas con tamaño de decodificación limitado.
+- Mis Alertas muestra la portada guardada y abre la ficha conservando la edición de la alerta, también después de actualizar el precio. Ajustes de texto en pantallas estrechas.
+
+### Alcance
+- Empaquetado en APK Release único universal `DinoxoGamers-V1.6.apk`, versión `1.6.0+7`.
+
+### Verificación
+- 112 pruebas automáticas de Flutter aprobadas y análisis de código con 0 advertencias ni errores.
+- 3 pruebas unitarias de Kotlin/JVM aprobadas para límites y muestreo de imágenes de alta resolución (12 MP, 50 MP, 200 MP).
+
 ## [1.5.0+6] - 2026-09-28
 
 ### Corregido
