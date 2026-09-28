@@ -2,6 +2,20 @@
 
 Todas las modificaciones notables de este proyecto se documentan en este archivo.
 
+## [1.3.0+4] - 2026-09-27
+
+### Añadido
+- **Galería Multimedia en Ficha de Juego**: Nueva sección interactiva situada bajo «Antes de comprar» con al menos 5 capturas en alta resolución y 2 tarjetas de video (Tráiler oficial y Video Reseña/Análisis). Incluye visor modal a pantalla completa con soporte táctil para zoom, paneo y miniaturas de video enlazadas a YouTube.
+- **Predicción de Próxima Rebaja y Precio Proyectado**: Algoritmo en `PriceEstimatorService` con proyección de rebajas estacionales estadounidenses (Summer Sale, Golden Week, Black Friday, Holiday, etc.). Calcula el precio proyectado (`$X.XX USD`) y porcentaje de descuento estimado (`-%`), presentados en una tarjeta visual destacada con badge de campaña estacional.
+- **Módulo Plus de Suscripciones**: Pestaña dedicada en la barra de navegación que lista los catálogos y juegos incluidos en suscripciones de PlayStation (PlayStation Plus Essential, Extra, Deluxe/Premium), Nintendo (Switch Online, Expansion Pack) y Xbox (Game Pass Core, Standard, Ultimate).
+- **Indicador de Suscripción en Ofertas, Búsqueda y Fichas**: Detección inteligente en tiempo real que alerta al usuario cuando un juego ya está incluido en un servicio de suscripción, evitando compras redundantes.
+
+### Corregido / Optimizado
+- **Iconografía Oficial en Dinoxo Store**: Reemplazo del icono musical genérico por el logotipo oficial de TikTok en la sección de redes sociales de Dinoxo Store.
+- **Reseñas y Veredicto Automático**: Análisis dinámico de puntuaciones de Metacritic/OpenCritic con recomendaciones automáticas («Compra Imprescindible», «Muy Recomendado», «Vale la pena con oferta», etc.).
+- **Diagnósticos de Ofertas Web**: Filtrado de mensajes de error engañosos en la carga de catálogos cuando las fichas se consultan progresivamente.
+- **Diseño Responsivo**: Corrección de desbordamientos visuales (RenderFlex) en pantallas estrechas en la tarjeta de estimación y modal de alertas.
+
 ## [1.2.0+3] - 2026-09-27
 
 ### Corregido

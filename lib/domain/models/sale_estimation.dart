@@ -7,6 +7,9 @@ class SaleEstimation {
   final String reason;
   final int historicalCyclesCount;
   final double? estimatedPrice;
+  final int? estimatedDiscountPercent;
+  final String? campaignName;
+  final bool isAlgorithmicProjection;
 
   const SaleEstimation({
     required this.hasEnoughData,
@@ -15,6 +18,9 @@ class SaleEstimation {
     required this.reason,
     required this.historicalCyclesCount,
     this.estimatedPrice,
+    this.estimatedDiscountPercent,
+    this.campaignName,
+    this.isAlgorithmicProjection = false,
   });
 
   static SaleEstimation insufficient() {
@@ -26,6 +32,11 @@ class SaleEstimation {
   }
 
   String get confidenceDisplay {
+    if (isAlgorithmicProjection) {
+      return confidence == EstimationConfidence.medium
+          ? 'Predictiva Media'
+          : 'Proyección de Mercado';
+    }
     switch (confidence) {
       case EstimationConfidence.low:
         return 'Baja';

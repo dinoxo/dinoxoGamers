@@ -216,7 +216,8 @@ class _DinoxoStoreScreenState extends State<DinoxoStoreScreen> {
   }
 
   Widget _buildElegantIconButton({
-    required IconData icon,
+    IconData? icon,
+    Widget? customChild,
     required Color color,
     required Gradient gradient,
     required String tooltip,
@@ -247,7 +248,7 @@ class _DinoxoStoreScreenState extends State<DinoxoStoreScreen> {
               ],
             ),
             child: Center(
-              child: Icon(icon, color: Colors.white, size: 28),
+              child: customChild ?? Icon(icon, color: Colors.white, size: 28),
             ),
           ),
         ),
@@ -401,10 +402,10 @@ class _DinoxoStoreScreenState extends State<DinoxoStoreScreen> {
 
                       // TikTok
                       _buildElegantIconButton(
-                        icon: Icons.music_note,
+                        customChild: const TikTokLogo(size: 26),
                         color: const Color(0xFF00F2FE),
                         gradient: const LinearGradient(
-                          colors: [Color(0xFF0F172A), Color(0xFF00F2FE)],
+                          colors: [Color(0xFF010101), Color(0xFF161823)],
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                         ),
@@ -754,3 +755,72 @@ class _DinoxoStoreScreenState extends State<DinoxoStoreScreen> {
     );
   }
 }
+
+class TikTokLogo extends StatelessWidget {
+  final double size;
+
+  const TikTokLogo({super.key, this.size = 26});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: size,
+      height: size,
+      child: CustomPaint(
+        painter: _TikTokPainter(),
+      ),
+    );
+  }
+}
+
+class _TikTokPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final scale = size.width / 24.0;
+
+    Path createPath() {
+      final p = Path();
+      p.moveTo(12.5 * scale, 2.0 * scale);
+      p.lineTo(15.5 * scale, 2.0 * scale);
+      p.cubicTo(15.7 * scale, 4.0 * scale, 17.2 * scale, 6.0 * scale, 19.5 * scale, 6.5 * scale);
+      p.cubicTo(20.5 * scale, 6.7 * scale, 21.6 * scale, 6.7 * scale, 22.5 * scale, 6.4 * scale);
+      p.lineTo(22.5 * scale, 9.8 * scale);
+      p.cubicTo(21.0 * scale, 9.8 * scale, 19.3 * scale, 9.3 * scale, 18.0 * scale, 8.4 * scale);
+      p.cubicTo(17.0 * scale, 7.7 * scale, 16.2 * scale, 6.8 * scale, 15.6 * scale, 5.8 * scale);
+      p.lineTo(15.6 * scale, 15.0 * scale);
+      p.cubicTo(15.6 * scale, 18.8 * scale, 12.5 * scale, 22.0 * scale, 8.5 * scale, 22.0 * scale);
+      p.cubicTo(4.8 * scale, 22.0 * scale, 1.8 * scale, 19.0 * scale, 1.8 * scale, 15.2 * scale);
+      p.cubicTo(1.8 * scale, 11.5 * scale, 4.8 * scale, 8.5 * scale, 8.5 * scale, 8.5 * scale);
+      p.cubicTo(9.2 * scale, 8.5 * scale, 9.9 * scale, 8.6 * scale, 10.5 * scale, 8.8 * scale);
+      p.lineTo(10.5 * scale, 12.2 * scale);
+      p.cubicTo(9.9 * scale, 11.9 * scale, 9.2 * scale, 11.8 * scale, 8.5 * scale, 11.8 * scale);
+      p.cubicTo(6.6 * scale, 11.8 * scale, 5.1 * scale, 13.3 * scale, 5.1 * scale, 15.2 * scale);
+      p.cubicTo(5.1 * scale, 17.1 * scale, 6.6 * scale, 18.6 * scale, 8.5 * scale, 18.6 * scale);
+      p.cubicTo(10.4 * scale, 18.6 * scale, 12.0 * scale, 17.1 * scale, 12.0 * scale, 15.2 * scale);
+      p.lineTo(12.0 * scale, 2.0 * scale);
+      p.close();
+      return p;
+    }
+
+    final path = createPath();
+
+    // Red shadow/offset (bottom-right)
+    canvas.save();
+    canvas.translate(1.2 * scale, 1.2 * scale);
+    canvas.drawPath(path, Paint()..color = const Color(0xFFFE2C55));
+    canvas.restore();
+
+    // Cyan shadow/offset (top-left)
+    canvas.save();
+    canvas.translate(-1.2 * scale, -1.2 * scale);
+    canvas.drawPath(path, Paint()..color = const Color(0xFF25F4EE));
+    canvas.restore();
+
+    // White foreground
+    canvas.drawPath(path, Paint()..color = Colors.white);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+

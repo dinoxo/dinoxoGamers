@@ -10,10 +10,12 @@ import '../../../domain/models/price_observation.dart';
 import '../../../domain/models/sale_estimation.dart';
 import '../../../domain/models/user_alert.dart';
 import '../../../domain/services/price_estimator_service.dart';
+import '../../../domain/services/subscription_service.dart';
 import '../../../domain/services/whatsapp_service.dart';
 import '../../core/widgets/platform_badge.dart';
 import '../../core/widgets/price_tag.dart';
 import '../../core/widgets/usa_badge.dart';
+import 'widgets/game_media_gallery_section.dart';
 import 'widgets/live_review_section.dart';
 import 'widgets/price_history_chart.dart';
 import 'widgets/sale_estimation_card.dart';
@@ -88,7 +90,13 @@ class _GameDetailsScreenState extends State<GameDetailsScreen> {
           );
     final est = PriceEstimatorService.estimateNextSale(
       observations: obs,
-      regularPrice: _game.primaryEdition?.regularPrice ?? 0,
+      regularPrice: _selectedEdition.regularPrice,
+      currentPrice: _selectedEdition.currentPrice,
+      providerReportedLowest: _selectedEdition.providerReportedLowest,
+      platform: _game.platform,
+      gameTitle: _game.title,
+      promoEndDate: _selectedEdition.promoEndDate,
+      allowMarketProjection: true,
     );
 
     if (mounted) {
@@ -277,10 +285,14 @@ class _GameDetailsScreenState extends State<GameDetailsScreen> {
             if (_refreshError != null) Text(_refreshError!),
             PlatformBadge(platform: _game.platform),
             const SizedBox(height: 16),
+            _buildSubscriptionAdvisoryCard(),
             const Text(
                 'Este juego figura en el catálogo, pero no hay un precio digital de Estados Unidos disponible en la fuente consultada.'),
             const SizedBox(height: 16),
             LiveReviewSection(game: _game),
+            const SizedBox(height: 16),
+            GameMediaGallerySection(game: _game),
+            const SizedBox(height: 16),
             TextButton(
                 onPressed: () => WhatsAppService.launchExternalUrl(
                     AppConstants.officialStoreUrlForGame(
@@ -505,6 +517,9 @@ class _GameDetailsScreenState extends State<GameDetailsScreen> {
                   ),
                   const SizedBox(height: 16),
 
+                  // Subscription Advisory Box
+                  _buildSubscriptionAdvisoryCard(),
+
                   // PRIMARY ACTIONS: Dinoxo Store & Alert
                   ElevatedButton.icon(
                     onPressed: () {
@@ -616,6 +631,10 @@ class _GameDetailsScreenState extends State<GameDetailsScreen> {
                   LiveReviewSection(game: _game),
                   const SizedBox(height: 20),
 
+                  // Multimedia Gallery (Screenshots & Videos)
+                  GameMediaGallerySection(game: _game),
+                  const SizedBox(height: 20),
+
                   // Source & Tracker Reference Link
                   if (_selectedEdition.sourceUrl.isNotEmpty) ...[
                     Container(
@@ -655,6 +674,63 @@ class _GameDetailsScreenState extends State<GameDetailsScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildSubscriptionAdvisoryCard() {
+    final subMatch = SubscriptionService.instance
+        .checkGame(_game.title, platform: _game.platform);
+    if (subMatch == null) return const SizedBox.shrink();
+
+    final isLeaving = subMatch.isLeavingSoon;
+    final isComing = subMatch.isComingSoon;
+
+    final color = isLeaving
+        ? AppTheme.warning
+        : (isComing ? const Color(0xFF00C3FF) : AppTheme.success);
+
+    final icon = isLeaving
+        ? Icons.warning_amber_rounded
+        : (isComing ? Icons.upcoming_rounded : Icons.lightbulb_rounded);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: color.withAlpha(22),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withAlpha(120), width: 1.2),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, color: color, size: 22),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  subMatch.advisoryTitle,
+                  style: TextStyle(
+                    color: color,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            subMatch.advisoryMessage,
+            style: const TextStyle(
+              color: AppTheme.textPrimary,
+              fontSize: 12.5,
+              height: 1.35,
+            ),
+          ),
+        ],
       ),
     );
   }
