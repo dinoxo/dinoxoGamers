@@ -1,17 +1,35 @@
-## [1.7.0+8] - 2026-09-28
-
-### Corregido
-- Corregido el error IMAGE_INVALID que ocurrÌa al analizar fotos tomadas o de la galerÌa. Se cambiÛ el acceso a los archivos para utilizar flujos directos en lugar de intentar forzar URLs de sistema, permitiendo que la foto se lea perfectamente.
-- ReducciÛn extrema de la presiÛn de memoria y picos de recolecciÛn de basura (Garbage Collection) durante la consulta de juegos del cat·logo de Nintendo Switch (Plus). Se reemplazaron algoritmos de parseo web pesados por expresiones regulares ligeras, solucionando problemas de "app congelada" o retardos de varios segundos en esa secciÛn.
-- El an·lisis de la c·mara ahora omite la pantalla intermedia ("Confirma el tÌtulo") y salta directamente a la b˙squeda en la web si el esc·ner (OCR) detectÛ el nombre del juego con Èxito y certeza. La pantalla de correcciÛn manual solo aparecer· como respaldo si la foto es muy borrosa o ilegible.
-
-### AÒadido
-- **Autocompletado predictivo en buscador:** La barra de "Escribe Tu Juego" ahora sugiere juegos instant·neamente (como Mario Kart, Super Mario Galaxy) al escribir 2 o m·s letras, gracias a una conexiÛn nativa con la API en vivo.
-- **Buscador en Ofertas:** Se agregÛ una barra inteligente de b˙squeda ("Busca Tu oferta") sobre los filtros de plataformas. Este buscador filtra y localiza en tiempo real ˙nicamente los tÌtulos que estÈn descontados dentro de esa categorÌa.
 # Changelog - Dinoxo Gamers
 
 Todas las modificaciones notables de este proyecto se documentan en este archivo.
 
+## [1.8.0+9] - 2026-10-01
+
+### A√±adido
+- **M√≥dulo de Preventas USA:** Cat√°logo de pr√≥ximos lanzamientos y preventas para PlayStation, Nintendo y Xbox con fechas anunciadas oficiales, b√∫squeda y autocompletado en tiempo real acotados a este cat√°logo, y acceso directo a la ficha del juego.
+- **Alertas de Lanzamiento:** Mis Alertas ahora diferencia entre objetivos de precio y recordatorios de fecha de lanzamiento. Android programa avisos un d√≠a antes y el d√≠a anunciado de salida, restableci√©ndolos autom√°ticamente tras reiniciar el tel√©fono.
+- **Sugerencias y Reconocimiento de Foto:** El buscador predice t√≠tulos desde el endpoint web oficial y abre autom√°ticamente la ficha cuando una foto identifica un juego √∫nico. Incluye lector local gratuito optimizado y soporte opcional de IA Gemini con clave personal almacenada de forma segura en el dispositivo.
+- **Detalles desde Plus:** Se habilit√≥ el acceso a la ficha completa de un juego directamente desde la secci√≥n "Ver detalles" en Plus.
+
+### Corregido
+- Corregido el motor de decodificaci√≥n de fotos para evitar fallos de formato en im√°genes de alta resoluci√≥n o formatos recientes de Android (HEIC/JPEG).
+- Ofertas y consultas en vivo ahora manejan t√≠tulos y descuentos actualizados din√°micamente sin bloqueos de memoria.
+
+### Alcance
+- Empaquetado en APK Release √∫nico universal `DinoxoGamers-V1.8.apk`, versi√≥n `1.8.0+9`.
+
+### Verificaci√≥n
+- Pruebas Flutter y nativas Android aprobadas, consulta real de pr√≥ximos lanzamientos USA verificada y empaquetado reproducible en contenedor.
+
+## [1.7.0+8] - 2026-09-28
+
+### Corregido
+- Corregido el error IMAGE_INVALID que ocurr√≠a al analizar fotos tomadas o de la galer√≠a. Se cambi√≥ el acceso a los archivos para utilizar flujos directos en lugar de intentar forzar URLs de sistema, permitiendo que la foto se lea perfectamente.
+- Reducci√≥n extrema de la presi√≥n de memoria y picos de recolecci√≥n de basura (Garbage Collection) durante la consulta de juegos del cat√°logo de Nintendo Switch (Plus). Se reemplazaron algoritmos de parseo web pesados por expresiones regulares ligeras, solucionando problemas de "app congelada" o retardos de varios segundos en esa secci√≥n.
+- El an√°lisis de la c√°mara ahora omite la pantalla intermedia ("Confirma el t√≠tulo") y salta directamente a la b√∫squeda en la web si el esc√°ner (OCR) detect√≥ el nombre del juego con √©xito y certeza. La pantalla de correcci√≥n manual solo aparecer√° como respaldo si la foto es muy borrosa o ilegible.
+
+### A√±adido
+- **Autocompletado predictivo en buscador:** La barra de "Escribe Tu Juego" ahora sugiere juegos instant√°neamente (como Mario Kart, Super Mario Galaxy) al escribir 2 o m√°s letras, gracias a una conexi√≥n nativa con la API en vivo.
+- **Buscador en Ofertas:** Se agreg√≥ una barra inteligente de b√∫squeda ("Busca Tu oferta") sobre los filtros de plataformas. Este buscador filtra y localiza en tiempo real √∫nicamente los t√≠tulos que est√©n descontados dentro de esa categor√≠a.
 ## [1.6.0+7] - 2026-09-28
 
 ### Corregido
