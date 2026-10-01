@@ -3,6 +3,7 @@ import '../../core/constants/app_constants.dart';
 import '../../domain/models/game.dart';
 import '../../domain/models/price_observation.dart';
 import '../../domain/models/user_alert.dart';
+import '../../domain/models/release_alert.dart';
 import '../../domain/services/notification_service.dart';
 import '../../domain/services/price_alert_scheduler.dart';
 import '../datasources/local_database_service.dart';
@@ -152,8 +153,17 @@ class GameRepository extends ChangeNotifier {
     return result;
   }
 
-  Future<List<String>> fetchAutocomplete(String query) async {
-    return await _web.fetchAutocomplete(query);
+  Future<List<String>> fetchAutocomplete(String query,
+      {GamePlatform? platform}) async {
+    return await _web.fetchAutocomplete(query, platform: platform);
+  }
+
+  Future<LiveCatalogPage> searchLiveDeals(String query,
+      {GamePlatform? platform, int page = 1}) async {
+    final result =
+        await _web.searchLiveDeals(query, platform: platform, page: page);
+    await _remember(result.games);
+    return result;
   }
 
   Future<void> _loadCache() async {
@@ -304,6 +314,56 @@ class GameRepository extends ChangeNotifier {
   Future<void> synchronizeAlertMonitoring() async =>
       PriceAlertScheduler.instance.synchronize(
           hasActiveAlerts: (await getAlerts()).any((alert) => alert.isActive));
+
+  Future<List<ReleaseAlert>> getReleaseAlerts() => _localDb.getReleaseAlerts();
+
+  Future<bool> saveReleaseAlert(ReleaseAlert alert) async {
+    final source = Uri.tryParse(alert.sourceUrl);
+    if (source == null || source.scheme != 'https' || source.host.isEmpty) {
+      throw ArgumentError(
+          'El lanzamiento necesita una fuente web verificable.');
+    }
+    if (alert.releaseDate.isBefore(DateTime(
+        DateTime.now().year, DateTime.now().month, DateTime.now().day))) {
+      throw ArgumentError('La fecha de salida ya pasó.');
+    }
+    await _localDb.saveReleaseAlert(alert);
+    notifyListeners();
+    try {
+      await NotificationService.instance.scheduleReleaseAlert(alert);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<void> deleteReleaseAlert(ReleaseAlert alert) async {
+    await _localDb.deleteReleaseAlert(alert.id);
+    await NotificationService.instance.cancelReleaseAlert(alert);
+    notifyListeners();
+  }
+
+  Future<bool> toggleReleaseAlertActive(ReleaseAlert alert) async {
+    final updated = alert.copyWith(isActive: !alert.isActive);
+    await _localDb.setReleaseAlertActive(alert.id, updated.isActive);
+    notifyListeners();
+    try {
+      await NotificationService.instance.scheduleReleaseAlert(updated);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<void> synchronizeReleaseNotifications() async {
+    for (final alert in await getReleaseAlerts()) {
+      try {
+        await NotificationService.instance.scheduleReleaseAlert(alert);
+      } catch (_) {
+        // The saved reminder stays visible and can be retried in Mis Alertas.
+      }
+    }
+  }
 
   // --- LIBRARY ---
   Future<List<Game>> getOwnedGames() async {

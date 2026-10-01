@@ -137,16 +137,37 @@ class LiveWebScraperService {
     return text;
   }
 
-  Future<List<String>> fetchAutocomplete(String query) async {
-    try {
-      final uri = Uri.https(host, '/search/autocomplete', {'q': query});
-      final res = await _client.get(uri).timeout(const Duration(seconds: 3));
-      if (res.statusCode == 200) {
-        final list = jsonDecode(res.body) as List;
-        return list.map((e) => e.toString()).toList();
+  Future<List<String>> fetchAutocomplete(String query,
+      {GamePlatform? platform}) async {
+    final term = query.trim();
+    // The site's own search box requests this endpoint from three characters.
+    if (term.length < 3) return [];
+    final cookie = await _session(platform);
+    final uri = Uri.https(host, '/autocomplete', {
+      'term': term,
+      'country': 'us',
+    });
+    final decoded = jsonDecode(await _get(uri, cookie));
+    if (decoded is! List) {
+      throw const CatalogException('La fuente cambió sus sugerencias.');
+    }
+    final seen = <String>{};
+    final titles = <String>[];
+    for (final entry in decoded) {
+      if (entry is! Map) continue;
+      final name = entry['name'];
+      final path = entry['url'];
+      if (name is! String ||
+          path is! String ||
+          !path.startsWith('/items/') ||
+          name.trim().length < 2 ||
+          name.length > 160) {
+        continue;
       }
-    } catch (_) {}
-    return [];
+      final title = name.trim();
+      if (seen.add(subscriptionTitleKey(title))) titles.add(title);
+    }
+    return titles;
   }
 
   Future<LiveCatalogPage> fetchLiveDeals(
@@ -179,6 +200,32 @@ class LiveWebScraperService {
     if (query.trim().length < 2) return const LiveCatalogPage([]);
     return _load('/search',
         query: query.trim(), platform: platform, page: page);
+  }
+
+  Future<LiveCatalogPage> searchLiveDeals(String query,
+      {GamePlatform? platform, int page = 1}) async {
+    if (query.trim().length < 2) return const LiveCatalogPage([]);
+    if (platform != null) {
+      return _load('/search',
+          query: query.trim(), platform: platform, page: page, dealsOnly: true);
+    }
+    final pages = await Future.wait(GamePlatform.values.map((p) async {
+      try {
+        return await _load('/search',
+            query: query.trim(), platform: p, page: page, dealsOnly: true);
+      } catch (e) {
+        return LiveCatalogPage(const [],
+            warnings: ['${AppConstants.platformDisplayName(p)}: $e']);
+      }
+    }));
+    if (pages.every((p) => p.games.isEmpty) &&
+        pages.any((p) => p.warnings.isNotEmpty)) {
+      throw CatalogException(pages.expand((p) => p.warnings).join('\n'));
+    }
+    return LiveCatalogPage(
+        {for (final g in pages.expand((p) => p.games)) g.id: g}.values.toList(),
+        hasMore: pages.any((p) => p.hasMore),
+        warnings: pages.expand((p) => p.warnings).toList());
   }
 
   Future<List<Game>> fetchGame(Game game) async {

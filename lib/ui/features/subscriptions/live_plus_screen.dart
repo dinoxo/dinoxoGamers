@@ -6,10 +6,15 @@ import '../../../core/utils/date_formatter.dart';
 import '../../../domain/models/subscription_item.dart';
 import '../../../domain/models/membership_benefits.dart';
 import '../../../domain/services/subscription_service.dart';
+import '../../../data/repositories/game_repository.dart';
+import '../../../domain/models/game.dart';
+import '../game_details/game_details_screen.dart';
 
 class PlusScreen extends StatefulWidget {
-  const PlusScreen({super.key, this.service, this.autoLoad = true});
+  const PlusScreen(
+      {super.key, this.service, this.repository, this.autoLoad = true});
   final SubscriptionService? service;
+  final GameRepository? repository;
   final bool autoLoad;
   @override
   State<PlusScreen> createState() => _PlusScreenState();
@@ -17,6 +22,7 @@ class PlusScreen extends StatefulWidget {
 
 class _PlusScreenState extends State<PlusScreen> {
   late final service = widget.service ?? SubscriptionService.instance;
+  late final GameRepository repository = widget.repository ?? GameRepository();
   GamePlatform? _platform;
   SubscriptionCategory _category = SubscriptionCategory.all;
   String _query = '';
@@ -31,6 +37,38 @@ class _PlusScreenState extends State<PlusScreen> {
   void dispose() {
     _debounce?.cancel();
     super.dispose();
+  }
+
+  Future<void> _openGame(SubscriptionItem item) async {
+    Game? game;
+    try {
+      final page =
+          await repository.searchOnline(item.title, platform: item.platform);
+      final sameTitle = page.games.where((candidate) =>
+          candidate.platform == item.platform &&
+          subscriptionTitleKey(candidate.title) ==
+              subscriptionTitleKey(item.title));
+      if (sameTitle.isNotEmpty) game = sameTitle.first;
+    } catch (_) {
+      // Membership details remain available when the shop listing is offline.
+    }
+    if (!mounted) return;
+    game ??= Game(
+        id: 'subscription_${item.id}',
+        title: item.title,
+        slug: item.id,
+        coverUrl: item.coverUrl,
+        platform: item.platform,
+        consoles: item.consoles,
+        genres: const [],
+        developer: '',
+        publisher: '',
+        releaseDate: null);
+    await Navigator.push(
+        context,
+        MaterialPageRoute<void>(
+            builder: (_) =>
+                GameDetailsScreen(game: game!, repository: repository)));
   }
 
   String get _emptyMessage => switch (_category) {
@@ -192,12 +230,14 @@ class _PlusScreenState extends State<PlusScreen> {
                                     MaterialPageRoute<void>(
                                         builder: (_) => _MembershipScreen(
                                             plan: benefits[index - 1],
-                                            service: service))));
+                                            service: service,
+                                            onOpenGame: _openGame))));
                           }
                           final item = items[index - 1];
                           return _SubscriptionCard(
                               key: ValueKey(item.id),
                               item: item,
+                              onOpen: () => _openGame(item),
                               stale: service.errors.containsKey(item.platform),
                               now: service.now);
                         },
@@ -210,8 +250,13 @@ class _PlusScreenState extends State<PlusScreen> {
 
 class _SubscriptionCard extends StatelessWidget {
   const _SubscriptionCard(
-      {super.key, required this.item, required this.now, this.stale = false});
+      {super.key,
+      required this.item,
+      required this.now,
+      required this.onOpen,
+      this.stale = false});
   final SubscriptionItem item;
+  final VoidCallback onOpen;
   final DateTime now;
   final bool stale;
   @override
@@ -281,33 +326,7 @@ class _SubscriptionCard extends StatelessWidget {
                           style: const TextStyle(
                               fontSize: 11, color: AppTheme.textSecondary)),
                     TextButton.icon(
-                        onPressed: () => showModalBottomSheet<void>(
-                            context: context,
-                            isScrollControlled: true,
-                            builder: (_) => SafeArea(
-                                child: SingleChildScrollView(
-                                    padding: const EdgeInsets.all(20),
-                                    child: Column(
-                                        mainAxisSize: MainAxisSize.min,
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(item.title,
-                                              style: Theme.of(context)
-                                                  .textTheme
-                                                  .titleLarge),
-                                          const SizedBox(height: 12),
-                                          Text(item.tier.displayName),
-                                          Text(item.consoles.join(' / ')),
-                                          Text(stale
-                                              ? 'La disponibilidad está pendiente de actualizar.'
-                                              : item.statusNote ??
-                                                  'Incluido durante la membresía activa.'),
-                                          const SizedBox(height: 16),
-                                          const Text(
-                                              'Fuente de la consulta · Estados Unidos'),
-                                          SelectableText(item.sourceUrl),
-                                        ])))),
+                        onPressed: onOpen,
                         icon: const Icon(Icons.info_outline, size: 14),
                         label: const Text('Ver detalles')),
                   ])),
@@ -350,9 +369,11 @@ class _BenefitsCard extends StatelessWidget {
 }
 
 class _MembershipScreen extends StatefulWidget {
-  const _MembershipScreen({required this.plan, required this.service});
+  const _MembershipScreen(
+      {required this.plan, required this.service, required this.onOpenGame});
   final MembershipBenefits plan;
   final SubscriptionService service;
+  final Future<void> Function(SubscriptionItem) onOpenGame;
   @override
   State<_MembershipScreen> createState() => _MembershipScreenState();
 }
@@ -459,6 +480,7 @@ class _MembershipScreenState extends State<_MembershipScreen> {
                         }
                         return _SubscriptionCard(
                             item: items[index - 1],
+                            onOpen: () => widget.onOpenGame(items[index - 1]),
                             now: widget.service.now,
                             stale: widget.service.errors
                                 .containsKey(tier.platform));

@@ -24,7 +24,7 @@ class AppConstants {
 
   // App Metadata
   static const String appName = 'Dinoxo Gamers';
-  static const String appVersion = '1.0.0';
+  static const String appVersion = '1.7.0+8';
   static const String commercialRegion = 'USA';
   static const String currencyCode = 'USD';
   static const String currencySymbol = '\$';

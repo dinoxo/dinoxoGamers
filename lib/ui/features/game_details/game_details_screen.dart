@@ -70,7 +70,13 @@ class _GameDetailsScreenState extends State<GameDetailsScreen> {
       final selectedId = _game.primaryEdition == null
           ? widget.selectedEditionId
           : _selectedEdition.id;
-      final current = await widget.repository.refreshGame(_game);
+      var current = await widget.repository.refreshGame(_game);
+      if (current.releaseDate == null && _game.releaseDate != null) {
+        current = Game.fromMap({
+          ...current.toMap(),
+          'releaseDate': _game.releaseDate!.toIso8601String(),
+        }, editions: current.editions, beforeYouBuy: current.beforeYouBuy);
+      }
       if (!mounted) return;
       setState(() {
         _game = current;
@@ -175,6 +181,22 @@ class _GameDetailsScreenState extends State<GameDetailsScreen> {
     }
   }
 
+  Widget _releaseCountdown() {
+    final date = _game.releaseDate;
+    if (date == null) return const SizedBox.shrink();
+    final today = DateTime.now();
+    final days = DateTime.utc(date.year, date.month, date.day)
+        .difference(DateTime.utc(today.year, today.month, today.day))
+        .inDays;
+    if (days < 0) return const SizedBox.shrink();
+    return Card(
+        child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Text(days == 0
+                ? 'Hoy es la fecha anunciada de lanzamiento · ${DateFormatter.formatShortDate(date)}'
+                : 'Faltan $days días para la fecha anunciada de lanzamiento · ${DateFormatter.formatShortDate(date)}')));
+  }
+
   @override
   Widget build(BuildContext context) => Theme(
       data: AppTheme.forPlatform(Theme.of(context), _game.platform),
@@ -192,7 +214,15 @@ class _GameDetailsScreenState extends State<GameDetailsScreen> {
             if (_refreshing) const LinearProgressIndicator(),
             if (_refreshError != null) Text(_refreshError!),
             PlatformBadge(platform: _game.platform),
+            if (_game.coverUrl.isNotEmpty)
+              Center(
+                  child: Image.network(_game.coverUrl,
+                      height: 180,
+                      cacheHeight: 360,
+                      errorBuilder: (_, __, ___) =>
+                          const Icon(Icons.sports_esports))),
             const SizedBox(height: 16),
+            _releaseCountdown(),
             _buildSubscriptionAdvisoryCard(),
             const Text(
                 'Este juego figura en el catálogo, pero no hay un precio digital de Estados Unidos disponible en la fuente consultada.'),
@@ -312,6 +342,7 @@ class _GameDetailsScreenState extends State<GameDetailsScreen> {
               ),
             ),
             const Divider(height: 1, color: AppTheme.divider),
+            _releaseCountdown(),
 
             Padding(
               padding: const EdgeInsets.all(16),

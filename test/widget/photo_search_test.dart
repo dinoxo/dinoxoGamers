@@ -15,8 +15,13 @@ import '../fixtures/test_repository.dart';
 class _Repo extends TestRepository {
   String? searched;
   List<Game> results = [];
+  List<String> suggestions = [];
   bool hasMore = false;
   List<String> warnings = [];
+  @override
+  Future<List<String>> fetchAutocomplete(String query,
+          {GamePlatform? platform}) async =>
+      suggestions;
   @override
   Future<LiveCatalogPage> searchOnline(String query,
       {GamePlatform? platform, int page = 1}) async {
@@ -90,8 +95,6 @@ void main() {
             readPhoto: (_) async => ['Ghost of Tsushima'])));
     await tester.tap(find.byTooltip('Leer título de una imagen'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Buscar en la web'));
-    await tester.pumpAndSettle();
     expect(find.byType(GameDetailsScreen), findsNothing);
     expect(find.text('Una ficha no se pudo consultar.'), findsOneWidget);
   });
@@ -119,8 +122,6 @@ void main() {
             pickPhoto: (_) async => XFile('/gallery/game.jpg'),
             readPhoto: (_) async => ['Ghost of Tsushima'])));
     await tester.tap(find.byTooltip('Leer título de una imagen'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Buscar en la web'));
     await tester.pumpAndSettle();
     expect(find.byType(GameDetailsScreen), findsNothing);
     expect(find.text('Cargar más resultados'), findsOneWidget);
@@ -150,8 +151,6 @@ void main() {
             readPhoto: (_) async => ["Ghost of Tsushima DIRECTOR'S CUT"])));
     await tester.tap(find.byTooltip('Leer título con la cámara'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Buscar en la web'));
-    await tester.pumpAndSettle();
     expect(repo.searched, "Ghost of Tsushima DIRECTOR'S CUT");
     expect(find.byType(GameDetailsScreen), findsNothing);
     expect(
@@ -160,7 +159,7 @@ void main() {
             matching: find.text("Ghost of Tsushima DIRECTOR'S CUT")),
         findsNWidgets(2));
   });
-  testWidgets('a unique confirmed photo title opens that game details',
+  testWidgets('a unique photo title opens that game details without a dialog',
       (tester) async {
     final repo = _Repo()
       ..results = [
@@ -183,13 +182,12 @@ void main() {
             readPhoto: (_) async => ["Ghost of Tsushima DIRECTOR'S CUT"])));
     await tester.tap(find.byTooltip('Leer título de una imagen'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Buscar en la web'));
-    await tester.pumpAndSettle();
     expect(find.byType(GameDetailsScreen), findsOneWidget);
+    expect(find.text('Confirma el título'), findsNothing);
   });
-  testWidgets('gallery text can be corrected and is searched online',
+  testWidgets('gallery title is normalized from live suggestions before search',
       (tester) async {
-    final repo = _Repo();
+    final repo = _Repo()..suggestions = ['Pokémon Scarlet'];
     await tester.pumpWidget(MaterialApp(
         home: SearchScreen(
             repository: repo,
@@ -197,11 +195,8 @@ void main() {
             readPhoto: (_) async => ['Pokemon Scarlet'])));
     await tester.tap(find.byTooltip('Leer título de una imagen'));
     await tester.pumpAndSettle();
-    await tester.enterText(
-        find.widgetWithText(TextField, 'Título del juego'), 'Pokémon Scarlet');
-    await tester.tap(find.text('Buscar en la web'));
-    await tester.pumpAndSettle();
     expect(repo.searched, 'Pokémon Scarlet');
+    expect(find.text('Confirma el título'), findsNothing);
   });
   testWidgets(
       'OCR failure still allows an actual search and does not blame camera permission',
@@ -216,10 +211,10 @@ void main() {
     await tester.tap(find.byTooltip('Leer título de una imagen'));
     await tester.pumpAndSettle();
     expect(find.textContaining('No se pudo reconocer'), findsOneWidget);
-    await tester.enterText(
-        find.widgetWithText(TextField, 'Título del juego'), 'Wolverine');
-    await tester.tap(find.text('Buscar en la web'));
+    await tester.enterText(find.byType(TextField), 'Wolverine');
+    await tester.pump(const Duration(milliseconds: 601));
     await tester.pumpAndSettle();
     expect(repo.searched, 'Wolverine');
+    expect(find.text('Confirma el título'), findsNothing);
   });
 }

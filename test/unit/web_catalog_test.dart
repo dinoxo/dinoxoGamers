@@ -118,6 +118,78 @@ void main() {
         throwsA(isA<CatalogException>()));
   });
 
+  test('autocomplete uses the public term endpoint with USA console session',
+      () async {
+    final requests = <Uri>[];
+    final web = LiveWebScraperService(client: MockClient((request) async {
+      requests.add(request.url);
+      if (request.method == 'POST') {
+        expect(request.bodyFields['platform_ps5'], 'true');
+        expect(request.bodyFields['platform_switch'], 'false');
+        expect(request.bodyFields['platform_xbox_series'], 'false');
+        return http.Response('', 303,
+            headers: {'set-cookie': 'rack.session=ps-test; Path=/'});
+      }
+      expect(request.url.path, '/autocomplete');
+      expect(request.url.queryParameters['term'], 'Ghost');
+      expect(request.url.queryParameters['country'], 'us');
+      expect(request.headers['Cookie'], 'rack.session=ps-test');
+      return http.Response(
+          '''[
+        {"name":"Ghost of Tsushima","value":"Ghost of Tsushima","url":"/items/ghost-of-tsushima"},
+        {"name":"Ghost of Tsushima","value":"Ghost of Tsushima","url":"/items/ghost-of-tsushima"},
+        {"name":"Ghost Trick","value":"Ghost Trick","url":"https://bad.example/items/ghost-trick"}
+      ]''',
+          200,
+          headers: {'content-type': 'application/json'});
+    }));
+    addTearDown(web.close);
+    expect(
+        await web.fetchAutocomplete(' Ghost ',
+            platform: GamePlatform.playstation),
+        ['Ghost of Tsushima']);
+    expect(requests.map((u) => u.path), ['/platforms', '/autocomplete']);
+  });
+
+  test('autocomplete reports HTTP errors instead of a false empty list',
+      () async {
+    final web = LiveWebScraperService(client: MockClient((request) async {
+      if (request.method == 'POST') {
+        return http.Response('', 303,
+            headers: {'set-cookie': 'rack.session=test;'});
+      }
+      return http.Response('blocked', 403);
+    }));
+    addTearDown(web.close);
+    expect(() => web.fetchAutocomplete('Pokemon'),
+        throwsA(isA<CatalogException>()));
+  });
+
+  test('offer search queries live USA titles and only returns real discounts',
+      () async {
+    final web = LiveWebScraperService(client: MockClient((request) async {
+      if (request.method == 'POST') {
+        return http.Response('', 303,
+            headers: {'set-cookie': 'rack.session=test;'});
+      }
+      if (request.url.path == '/search') {
+        expect(request.url.queryParameters['q'], 'Hades');
+        expect(request.url.queryParameters['country'], 'us');
+        return http.Response(listingHtml(['hades', 'full-price']), 200);
+      }
+      if (request.url.path.endsWith('/hades')) {
+        return http.Response(offerHtml(title: 'Hades'), 200);
+      }
+      return http.Response(
+          offerHtml(title: 'Full Price', price: 1999, discount: 0), 200);
+    }));
+    addTearDown(web.close);
+    final result =
+        await web.searchLiveDeals('Hades', platform: GamePlatform.playstation);
+    expect(result.games.map((g) => g.title), ['Hades']);
+    expect(result.games.single.hasDiscount, isTrue);
+  });
+
   test(
       'one failed edition remains a visible partial search, not a unique match',
       () async {

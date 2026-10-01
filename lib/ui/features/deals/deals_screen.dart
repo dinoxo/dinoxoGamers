@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../data/datasources/web_scraper_service.dart';
 import '../../../data/repositories/game_repository.dart';
 import '../../../domain/models/game.dart';
 import '../../core/widgets/deal_card.dart';
+import '../../core/widgets/live_game_autocomplete.dart';
 import '../game_details/game_details_screen.dart';
 
 class DealsScreen extends StatefulWidget {
@@ -14,6 +16,8 @@ class DealsScreen extends StatefulWidget {
 }
 
 class _DealsScreenState extends State<DealsScreen> {
+  final _searchController = TextEditingController();
+  Timer? _searchDebounce;
   GamePlatform? _platform;
   List<Game> _games = [];
   Set<String> _favorites = {};
@@ -34,10 +38,40 @@ class _DealsScreenState extends State<DealsScreen> {
   @override
   void dispose() {
     _generation++;
+    _searchDebounce?.cancel();
+    _searchController.dispose();
     super.dispose();
   }
 
+  void _changed(String text) {
+    _searchDebounce?.cancel();
+    final query = text.trim();
+    ++_generation;
+    setState(() {
+      _searchQuery = query;
+      _games = [];
+      _hasMore = false;
+      _error = null;
+      _warning = null;
+      _busy = query.isEmpty || query.length >= 2;
+    });
+    if (query.isEmpty) {
+      _load();
+    } else if (query.length >= 2) {
+      _searchDebounce = Timer(const Duration(milliseconds: 450), _load);
+    }
+  }
+
   Future<void> _load({bool more = false}) async {
+    if (_searchQuery.length == 1) {
+      ++_generation;
+      setState(() {
+        _busy = false;
+        _games = [];
+        _hasMore = false;
+      });
+      return;
+    }
     final generation = ++_generation;
     final page = more ? _page + 1 : 1;
     setState(() {
@@ -50,8 +84,12 @@ class _DealsScreenState extends State<DealsScreen> {
       }
     });
     try {
-      final result = await widget.repository
-          .refreshLiveDeals(platform: _platform, page: page);
+      final query = _searchQuery;
+      final result = query.length >= 2
+          ? await widget.repository
+              .searchLiveDeals(query, platform: _platform, page: page)
+          : await widget.repository
+              .refreshLiveDeals(platform: _platform, page: page);
       final favorites = await widget.repository.getFavoriteGames();
       if (!mounted || generation != _generation) return;
       setState(() {
@@ -80,10 +118,6 @@ class _DealsScreenState extends State<DealsScreen> {
     var games = _games
         .where((g) => _maxPrice == null || g.currentPrice <= _maxPrice!)
         .toList();
-    if (_searchQuery.isNotEmpty) {
-      final q = _searchQuery.toLowerCase();
-      games = games.where((g) => g.title.toLowerCase().contains(q)).toList();
-    }
     return Scaffold(
         appBar: AppBar(title: const Text('Ofertas Destacadas'), actions: [
           IconButton(
@@ -94,39 +128,21 @@ class _DealsScreenState extends State<DealsScreen> {
         body: Column(children: [
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            child: Autocomplete<String>(
-              optionsBuilder: (textEditingValue) {
-                final query = textEditingValue.text.trim().toLowerCase();
-                if (query.isEmpty) return const Iterable<String>.empty();
-                return _games
-                    .where((g) => g.title.toLowerCase().contains(query))
-                    .map((g) => g.title)
-                    .toSet();
+            child: LiveGameAutocomplete(
+              key: ValueKey('deals_${_platform?.name ?? 'all'}'),
+              controller: _searchController,
+              hintText: 'Busca Tu oferta',
+              suggestions: (query) => widget.repository
+                  .fetchAutocomplete(query, platform: _platform),
+              onChanged: _changed,
+              onSubmitted: (_) {
+                _searchDebounce?.cancel();
+                if (_searchQuery.length >= 2) _load();
               },
               onSelected: (selection) {
+                _searchDebounce?.cancel();
                 setState(() => _searchQuery = selection);
-              },
-              fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
-                return TextField(
-                  controller: controller,
-                  focusNode: focusNode,
-                  onChanged: (val) {
-                    setState(() => _searchQuery = val);
-                  },
-                  onSubmitted: (_) {
-                    onFieldSubmitted();
-                  },
-                  textInputAction: TextInputAction.search,
-                  decoration: InputDecoration(
-                      hintText: 'Busca Tu oferta',
-                      prefixIcon: const Icon(Icons.search),
-                      suffixIcon: IconButton(
-                          icon: const Icon(Icons.clear),
-                          onPressed: () {
-                            controller.clear();
-                            setState(() => _searchQuery = '');
-                          })),
-                );
+                _load();
               },
             ),
           ),
@@ -144,6 +160,7 @@ class _DealsScreenState extends State<DealsScreen> {
                           selected: p == _platform,
                           onSelected: (_) {
                             setState(() => _platform = p);
+                            _searchDebounce?.cancel();
                             _load();
                           })),
               ])),
@@ -184,7 +201,9 @@ class _DealsScreenState extends State<DealsScreen> {
                               padding: const EdgeInsets.all(24),
                               child: Text(
                                   _error == null
-                                      ? 'No hay descuentos digitales verificados en esta página con estos filtros.'
+                                      ? _searchQuery.length == 1
+                                          ? 'Escribe al menos dos caracteres para consultar ofertas.'
+                                          : 'No hay descuentos digitales verificados en esta página con estos filtros.'
                                       : 'No pudimos actualizar las ofertas. Pulsa Reintentar.',
                                   textAlign: TextAlign.center)),
                         for (final game in games)

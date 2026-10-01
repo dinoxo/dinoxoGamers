@@ -6,7 +6,30 @@ import 'package:dinoxo_gamers/domain/models/subscription_item.dart';
 import 'package:dinoxo_gamers/domain/models/membership_benefits.dart';
 import 'package:dinoxo_gamers/domain/services/subscription_service.dart';
 import 'package:dinoxo_gamers/ui/features/subscriptions/plus_screen.dart';
+import 'package:dinoxo_gamers/ui/features/game_details/game_details_screen.dart';
+import 'package:dinoxo_gamers/data/datasources/web_scraper_service.dart';
+import 'package:dinoxo_gamers/domain/models/game.dart';
 import '../fixtures/subscriptions.dart';
+import '../fixtures/test_repository.dart';
+
+class _PlusGameRepository extends TestRepository {
+  @override
+  Future<LiveCatalogPage> searchOnline(String query,
+          {GamePlatform? platform, int page = 1}) async =>
+      LiveCatalogPage([
+        Game(
+            id: 'plus_game',
+            title: query,
+            slug: 'plus-game',
+            coverUrl: '',
+            platform: platform!,
+            consoles: const ['PS5'],
+            genres: const [],
+            developer: '',
+            publisher: '',
+            releaseDate: null)
+      ]);
+}
 
 void main() {
   testWidgets(
@@ -49,6 +72,23 @@ void main() {
     expect(tester.takeException(), isNull);
   });
   setUpAll(() => initializeDateFormatting('es'));
+  testWidgets('Ver detalles from a Plus game opens that game ficha',
+      (tester) async {
+    final service = SubscriptionService(
+        source: TestSubscriptionSource([subscription()]),
+        clock: () => DateTime(2026, 9, 27));
+    await service.refresh();
+    await tester.pumpWidget(MaterialApp(
+        home: PlusScreen(
+            service: service,
+            repository: _PlusGameRepository(),
+            autoLoad: false)));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Ver detalles').first);
+    await tester.pumpAndSettle();
+    expect(find.byType(GameDetailsScreen), findsOneWidget);
+    expect(find.text('Resident Evil 2'), findsWidgets);
+  });
   testWidgets(
       'benefits are rendered from the loaded plan and are reachable on a phone',
       (tester) async {

@@ -15,6 +15,7 @@ void main() async {
   WidgetsBinding.instance.addPostFrameCallback((_) async {
     await NotificationService.instance.initialize();
     unawaited(gameRepository.synchronizeAlertMonitoring());
+    unawaited(gameRepository.synchronizeReleaseNotifications());
     unawaited(SubscriptionService.instance.ensureLoaded());
   });
 }

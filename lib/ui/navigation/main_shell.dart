@@ -1,13 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:uuid/uuid.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_theme.dart';
 import '../../data/repositories/game_repository.dart';
+import '../../domain/models/release_alert.dart';
+import '../../domain/models/preorder_game.dart';
 import '../../domain/services/notification_service.dart';
 import '../../domain/services/subscription_service.dart';
 import '../core/widgets/usa_badge.dart';
 import '../features/alerts/alerts_screen.dart';
 import '../features/deals/deals_screen.dart';
+import '../features/preorders/preorders_screen.dart';
 import '../features/library/library_screen.dart';
 import '../features/search/search_screen.dart';
 import '../features/store/dinoxo_store_screen.dart';
@@ -46,13 +50,62 @@ class _MainShellState extends State<MainShell> {
               });
             }
           }),
-      const PlusScreen(autoLoad: false),
+      PlusScreen(autoLoad: false, repository: widget.repository),
+      PreordersScreen(
+          repository: widget.repository,
+          onCreateReleaseAlert: _createReleaseAlert),
       AlertsScreen(repository: widget.repository),
       const DinoxoStoreScreen(),
     ];
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkFirstRunPermissions();
     });
+  }
+
+  Future<void> _createReleaseAlert(PreorderGame game) async {
+    final date = game.releaseDate;
+    if (date == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Este anuncio aún no tiene una fecha confirmada.')));
+      return;
+    }
+    try {
+      final existing = await widget.repository.getReleaseAlerts();
+      final duplicate = existing.any((alert) =>
+          alert.platform == game.platform &&
+          alert.gameTitle == game.title &&
+          alert.releaseDate.year == date.year &&
+          alert.releaseDate.month == date.month &&
+          alert.releaseDate.day == date.day);
+      if (duplicate) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+              content: Text('Este lanzamiento ya está en Mis Alertas.')));
+        }
+        return;
+      }
+      final permission = await NotificationService.instance.requestPermission();
+      final scheduled = await widget.repository.saveReleaseAlert(ReleaseAlert(
+          id: const Uuid().v4(),
+          gameTitle: game.title,
+          platform: game.platform,
+          coverUrl: game.coverUrl,
+          sourceUrl: game.sourceUri.toString(),
+          releaseDate: date,
+          createdAt: DateTime.now()));
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(!permission
+              ? 'Aviso guardado en Mis Alertas. Activa las notificaciones de Android para recibirlo.'
+              : scheduled
+                  ? 'Aviso programado para los plazos pendientes de este lanzamiento.'
+                  : 'Aviso guardado, pero Android no permitió programarlo.')));
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('No se pudo guardar este aviso. Reintenta.')));
+      }
+    }
   }
 
   Future<void> _checkFirstRunPermissions() async {
@@ -175,7 +228,7 @@ class _MainShellState extends State<MainShell> {
                         ),
                         SizedBox(height: 3),
                         Text(
-                          'Se utiliza para escanear etiquetas de precios físicos mediante OCR y comprobar si conviene comprar en digital.',
+                          'Se utiliza para reconocer el título de un videojuego en una foto y consultar su ficha USA.',
                           style: TextStyle(
                             color: AppTheme.textMuted,
                             fontSize: 11,
@@ -238,7 +291,7 @@ class _MainShellState extends State<MainShell> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'Versión 1.0.0 · Edición Gratuita Universal',
+              'Versión ${AppConstants.appVersion} · Edición Gratuita Universal',
               style: TextStyle(
                   color: AppTheme.secondary,
                   fontSize: 12,
@@ -398,6 +451,11 @@ class _MainShellState extends State<MainShell> {
             icon: Icon(Icons.card_membership_outlined),
             activeIcon: Icon(Icons.card_membership_rounded),
             label: 'Plus',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.event_outlined),
+            activeIcon: Icon(Icons.event),
+            label: 'Preventas',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.notifications_none),

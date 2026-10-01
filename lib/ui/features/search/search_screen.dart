@@ -5,11 +5,14 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../domain/services/ocr_service.dart';
+import '../../../domain/services/gemini_image_service.dart';
+import '../../../domain/services/gemini_key_store.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../data/datasources/web_scraper_service.dart';
 import '../../../data/repositories/game_repository.dart';
 import '../../../domain/models/game.dart';
 import '../../core/widgets/deal_card.dart';
+import '../../core/widgets/live_game_autocomplete.dart';
 import '../game_details/game_details_screen.dart';
 
 class SearchScreen extends StatefulWidget {
@@ -29,7 +32,6 @@ class SearchScreen extends StatefulWidget {
 
 class _SearchScreenState extends State<SearchScreen> {
   final _controller = TextEditingController();
-  TextEditingController? _autoController;
   Timer? _debounce;
   int _generation = 0;
   int _page = 1;
@@ -62,8 +64,7 @@ class _SearchScreenState extends State<SearchScreen> {
         setState(() => _readingPhoto = true);
         await _readPhoto(lost.files!.first);
       } else if (lost.exception != null) {
-        await _confirmPhoto([],
-            error: OcrService.errorMessage(lost.exception!));
+        _showPhotoError(OcrService.errorMessage(lost.exception!));
       }
     } catch (_) {
       // No pending selection is a normal state when the picker was not used.
@@ -80,10 +81,14 @@ class _SearchScreenState extends State<SearchScreen> {
     try {
       final photo = widget.pickPhoto != null
           ? await widget.pickPhoto!(source)
-          : await ImagePicker().pickImage(source: source);
+          : await ImagePicker().pickImage(
+              source: source,
+              maxWidth: 2048,
+              maxHeight: 2048,
+              imageQuality: 85);
       if (mounted && photo != null) await _readPhoto(photo);
     } catch (error) {
-      await _confirmPhoto([], error: OcrService.errorMessage(error));
+      _showPhotoError(OcrService.errorMessage(error));
     } finally {
       _photoFlow = false;
       if (mounted) setState(() => _readingPhoto = false);
@@ -92,36 +97,229 @@ class _SearchScreenState extends State<SearchScreen> {
 
   Future<void> _readPhoto(XFile photo) async {
     if (!mounted) return;
+    PhotoRecognition? visualResult;
+    String? visualError;
+    if (widget.readPhoto == null) {
+      try {
+        final key = await GeminiKeyStore.activeKey();
+        if (key != null) {
+          final length = await photo.length();
+          if (length > GeminiImageService.maxImageBytes) {
+            throw const GeminiImageException(
+                'La foto supera el límite de Gemini; se intentará leer localmente.');
+          }
+          final bytes = await photo.readAsBytes();
+          final mime = GeminiImageService.detectImageMime(bytes);
+          if (mime == null) {
+            throw const GeminiImageException(
+                'Gemini no reconoce el formato de esta foto.');
+          }
+          final gemini = GeminiImageService();
+          try {
+            final titles =
+                await gemini.identifyGames(bytes, mimeType: mime, apiKey: key);
+            if (titles.isNotEmpty) visualResult = PhotoRecognition(titles);
+          } finally {
+            gemini.close();
+          }
+        }
+      } on GeminiImageException catch (error) {
+        visualError = error.message;
+      } catch (_) {
+        visualError = 'Gemini no pudo analizar la foto.';
+      }
+    }
     try {
-      final recognition = widget.readPhoto == null
-          ? await OcrService.recognizePhoto(photo.path)
-          : PhotoRecognition(await widget.readPhoto!(photo.path)
-              .timeout(const Duration(seconds: 20)));
-      final lines = recognition.candidates;
-      await _confirmPhoto(lines,
-          platform: recognition.platform,
-          error: lines.isEmpty
-              ? 'No se reconoció texto en la imagen. Escribe el título o prueba una foto donde se vea con claridad.'
-              : null);
+      final recognition = visualResult ??
+          (widget.readPhoto == null
+              ? await OcrService.recognizePhoto(photo.path)
+              : PhotoRecognition(await widget.readPhoto!(photo.path)
+                  .timeout(const Duration(seconds: 20))));
+      await _searchRecognizedPhoto(recognition);
     } catch (error) {
-      await _confirmPhoto([], error: OcrService.errorMessage(error));
+      _showPhotoError(visualError == null
+          ? OcrService.errorMessage(error)
+          : '$visualError ${OcrService.errorMessage(error)}');
     }
   }
 
-  Future<void> _confirmPhoto(List<String> lines,
-      {String? error, GamePlatform? platform}) async {
-    if (!mounted) return;
-    setState(() => _readingPhoto = false);
-
-    final query = await showDialog<String>(
+  Future<void> _showPhotoSettings() async {
+    final controller = TextEditingController();
+    bool enabled = false;
+    try {
+      enabled = await GeminiKeyStore.isEnabled();
+    } catch (_) {}
+    if (!mounted) {
+      controller.dispose();
+      return;
+    }
+    await showModalBottomSheet<void>(
         context: context,
-        builder: (_) => _PhotoQueryDialog(lines: lines, error: error));
+        isScrollControlled: true,
+        builder: (sheetContext) => SafeArea(
+                child: Padding(
+              padding: EdgeInsets.fromLTRB(20, 20, 20,
+                  MediaQuery.viewInsetsOf(sheetContext).bottom + 20),
+              child: SingleChildScrollView(
+                  child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                    Text('Lectura de fotos',
+                        style: Theme.of(sheetContext).textTheme.titleLarge),
+                    const SizedBox(height: 10),
+                    Text(enabled
+                        ? 'Gemini con tu clave personal está activo.'
+                        : 'Por defecto, el lector gratuito analiza la foto en tu teléfono.'),
+                    const SizedBox(height: 8),
+                    const Text(
+                        'Si activas Gemini, la foto se envía a Google para '
+                        'identificar hasta tres juegos. La app comprueba luego los '
+                        'títulos en el catálogo USA. El plan gratuito tiene límites.'),
+                    const SizedBox(height: 14),
+                    TextField(
+                        controller: controller,
+                        obscureText: true,
+                        enableSuggestions: false,
+                        autocorrect: false,
+                        decoration: const InputDecoration(
+                            labelText: 'Tu clave API de Gemini')),
+                    const SizedBox(height: 12),
+                    Wrap(spacing: 8, children: [
+                      TextButton(
+                          onPressed: () async {
+                            await GeminiKeyStore.useLocalReader();
+                            if (sheetContext.mounted) {
+                              Navigator.pop(sheetContext);
+                            }
+                          },
+                          child: const Text('Usar lector gratuito')),
+                      FilledButton(
+                          onPressed: () async {
+                            try {
+                              await GeminiKeyStore.save(controller.text);
+                              if (sheetContext.mounted) {
+                                Navigator.pop(sheetContext);
+                              }
+                            } catch (_) {
+                              if (sheetContext.mounted) {
+                                ScaffoldMessenger.of(sheetContext).showSnackBar(
+                                    const SnackBar(
+                                        content: Text(
+                                            'No se pudo guardar la clave. Revisa el texto e inténtalo.')));
+                              }
+                            }
+                          },
+                          child: const Text('Guardar y usar Gemini')),
+                      TextButton(
+                          onPressed: () async {
+                            await GeminiKeyStore.deleteKey();
+                            if (sheetContext.mounted) {
+                              Navigator.pop(sheetContext);
+                            }
+                          },
+                          child: const Text('Borrar clave')),
+                    ]),
+                  ])),
+            )));
+    controller.dispose();
+  }
 
-    if (!mounted || query == null || query.trim().isEmpty) return;
-    _controller.text = query.trim();
-    _autoController?.text = query.trim();
-    setState(() => _platform = platform);
-    await _search(openPhotoMatch: true);
+  void _showPhotoError(String message) {
+    if (!mounted) return;
+    setState(() => _error = message);
+  }
+
+  static String _photoKey(String title) => subscriptionTitleKey(title)
+      .replaceAll(RegExp(r'[áàâäãå]'), 'a')
+      .replaceAll(RegExp(r'[éèêë]'), 'e')
+      .replaceAll(RegExp(r'[íìîï]'), 'i')
+      .replaceAll(RegExp(r'[óòôöõ]'), 'o')
+      .replaceAll(RegExp(r'[úùûü]'), 'u');
+
+  Future<void> _searchRecognizedPhoto(PhotoRecognition recognition) async {
+    if (!mounted) return;
+    final candidates = recognition.candidates
+        .map((line) => line.trim())
+        .where((line) => line.length >= 2 && line.length <= 160)
+        .take(8)
+        .toList();
+    if (candidates.isEmpty) {
+      _showPhotoError(
+          'No se reconoció un juego en la imagen. Prueba otra foto o escribe el título.');
+      return;
+    }
+    final checks = await Future.wait(candidates.map((candidate) async {
+      try {
+        final suggestions = await widget.repository
+            .fetchAutocomplete(candidate, platform: recognition.platform)
+            .timeout(const Duration(seconds: 5));
+        return suggestions
+            .where((title) => _photoKey(title) == _photoKey(candidate))
+            .toList();
+      } catch (_) {
+        // A failed suggestion request must not suppress the actual title search.
+        return <String>[];
+      }
+    }));
+    final verified = checks.expand((titles) => titles).toSet();
+    if (!mounted) return;
+    final titles = verified
+        .where((title) => !verified.any((other) =>
+            other != title && _photoKey(other).contains(_photoKey(title))))
+        .take(3)
+        .toList();
+    final query = titles.isEmpty ? candidates.first : titles.first;
+    _controller.text = query;
+    setState(() {
+      _platform = recognition.platform;
+      _error = null;
+    });
+    if (titles.length > 1) {
+      await _searchPhotoTitles(titles);
+    } else {
+      await _search(openPhotoMatch: true);
+    }
+  }
+
+  Future<void> _searchPhotoTitles(List<String> titles) async {
+    final generation = ++_generation;
+    setState(() {
+      _busy = true;
+      _games = [];
+      _error = null;
+    });
+    try {
+      final pages = await Future.wait(titles.map((title) async {
+        try {
+          return await widget.repository
+              .searchOnline(title, platform: _platform);
+        } catch (e) {
+          return LiveCatalogPage(const [], warnings: [
+            e is CatalogException ? e.message : 'No se pudo consultar $title.'
+          ]);
+        }
+      }));
+      final favorites = await widget.repository.getFavoriteGames();
+      if (!mounted || generation != _generation) return;
+      setState(() {
+        _games = {for (final g in pages.expand((p) => p.games)) g.id: g}
+            .values
+            .toList();
+        _favorites = favorites.map((g) => g.id).toSet();
+        _hasMore = pages.any((p) => p.hasMore);
+        final warnings = pages.expand((p) => p.warnings).toList();
+        _warning = warnings.isEmpty ? null : warnings.join('\n');
+      });
+    } catch (e) {
+      if (mounted && generation == _generation) {
+        _showPhotoError(e is CatalogException
+            ? e.message
+            : 'No se pudieron consultar los juegos reconocidos. Reintenta.');
+      }
+    } finally {
+      if (mounted && generation == _generation) setState(() => _busy = false);
+    }
   }
 
   @override
@@ -180,8 +378,7 @@ class _SearchScreenState extends State<SearchScreen> {
       });
       if (openPhotoMatch) {
         final matches = result.games
-            .where((game) =>
-                subscriptionTitleKey(game.title) == subscriptionTitleKey(query))
+            .where((game) => _photoKey(game.title) == _photoKey(query))
             .toList();
         if (matches.length == 1 && !result.hasMore && result.warnings.isEmpty) {
           unawaited(Navigator.push(
@@ -211,6 +408,10 @@ class _SearchScreenState extends State<SearchScreen> {
   Widget _buildPage(BuildContext context) => Scaffold(
         appBar: AppBar(title: const Text('Buscar Juegos'), actions: [
           IconButton(
+              tooltip: 'Configurar análisis de fotos',
+              onPressed: _readingPhoto ? null : _showPhotoSettings,
+              icon: const Icon(Icons.auto_awesome_outlined)),
+          IconButton(
               tooltip: 'Leer título con la cámara',
               onPressed:
                   _readingPhoto ? null : () => _photo(ImageSource.camera),
@@ -224,42 +425,18 @@ class _SearchScreenState extends State<SearchScreen> {
         body: Column(children: [
           Padding(
               padding: const EdgeInsets.all(12),
-              child: Autocomplete<String>(
-                optionsBuilder: (textEditingValue) async {
-                  final query = textEditingValue.text.trim();
-                  if (query.length < 2) return const Iterable<String>.empty();
-                  return await widget.repository.fetchAutocomplete(query);
-                },
+              child: LiveGameAutocomplete(
+                key: ValueKey('search_${_platform?.name ?? 'all'}'),
+                controller: _controller,
+                hintText: 'Escribe Tu Juego',
+                suggestions: (query) => widget.repository
+                    .fetchAutocomplete(query, platform: _platform),
                 onSelected: (selection) {
                   _controller.text = selection;
                   _search();
                 },
-                fieldViewBuilder: (context, textEditingController, focusNode, onFieldSubmitted) {
-                  _autoController = textEditingController;
-                  return TextField(
-                    controller: textEditingController,
-                    focusNode: focusNode,
-                    onChanged: (value) {
-                      _controller.text = value;
-                      _changed(value);
-                    },
-                    onSubmitted: (_) {
-                      onFieldSubmitted();
-                      _search();
-                    },
-                    textInputAction: TextInputAction.search,
-                    decoration: InputDecoration(
-                        hintText: 'Escribe Tu Juego',
-                        prefixIcon: const Icon(Icons.search),
-                        suffixIcon: IconButton(
-                            icon: const Icon(Icons.clear),
-                            onPressed: () {
-                              textEditingController.clear();
-                              _controller.clear();
-                              _changed('');
-                            })),
-                  );
-                },
+                onChanged: _changed,
+                onSubmitted: (_) => _search(),
               )),
           SingleChildScrollView(
               scrollDirection: Axis.horizontal,
@@ -337,59 +514,4 @@ class _SearchScreenState extends State<SearchScreen> {
                       ]))),
         ]),
       );
-}
-
-class _PhotoQueryDialog extends StatefulWidget {
-  final List<String> lines;
-  final String? error;
-  const _PhotoQueryDialog({required this.lines, this.error});
-  @override
-  State<_PhotoQueryDialog> createState() => _PhotoQueryDialogState();
-}
-
-class _PhotoQueryDialogState extends State<_PhotoQueryDialog> {
-  final _edit = TextEditingController();
-  @override
-  void initState() {
-    super.initState();
-    if (widget.lines.isNotEmpty) _edit.text = widget.lines.first;
-  }
-
-  @override
-  void dispose() {
-    _edit.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) => AlertDialog(
-          title: const Text('Confirma el título'),
-          content: SingleChildScrollView(
-              child: Column(mainAxisSize: MainAxisSize.min, children: [
-            Text(widget.error ??
-                'Selecciona el texto del juego; puedes corregirlo antes de buscar.'),
-            Wrap(
-                spacing: 6,
-                children: widget.lines
-                    .take(20)
-                    .map((s) => ActionChip(
-                        label: Text(s), onPressed: () => _edit.text = s))
-                    .toList()),
-            TextField(
-                controller: _edit,
-                decoration:
-                    const InputDecoration(labelText: 'Título del juego')),
-          ])),
-          actions: [
-            TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Cancelar')),
-            TextButton(
-                onPressed: () {
-                  if (_edit.text.trim().length >= 2) {
-                    Navigator.pop(context, _edit.text.trim());
-                  }
-                },
-                child: const Text('Buscar en la web'))
-          ]);
 }

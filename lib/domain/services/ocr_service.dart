@@ -122,7 +122,11 @@ class OcrService {
         case 'IMAGE_MISSING':
           return 'No se pudo abrir esta imagen. Selecciónala de nuevo desde la galería.';
         case 'IMAGE_INVALID':
-          return 'El formato de la imagen no pudo leerse. Prueba con una captura JPG o PNG.';
+          return 'No se pudo decodificar esta foto. Prueba otra imagen o escribe el título.';
+        case 'IMAGE_READ_FAILED':
+          return 'Android no pudo abrir la foto seleccionada. Vuelve a elegirla desde la galería.';
+        case 'IMAGE_TOO_LARGE':
+          return 'La foto es demasiado grande para analizarla. Prueba una captura o una foto más pequeña.';
         case 'OCR_FAILED':
           return 'No se pudo reconocer el texto. Puedes introducir o corregir el título y buscarlo.';
       }

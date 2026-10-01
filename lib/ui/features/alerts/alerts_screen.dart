@@ -4,6 +4,8 @@ import '../../../core/utils/currency_formatter.dart';
 import '../../../core/utils/date_formatter.dart';
 import '../../../data/repositories/game_repository.dart';
 import '../../../domain/models/user_alert.dart';
+import '../../../domain/models/release_alert.dart';
+import '../../../domain/services/subscription_title.dart';
 import '../../../domain/models/game.dart';
 import '../../../domain/services/notification_service.dart';
 import '../../core/widgets/empty_state_view.dart';
@@ -24,6 +26,7 @@ class AlertsScreen extends StatefulWidget {
 
 class _AlertsScreenState extends State<AlertsScreen> {
   List<UserAlert> _alerts = [];
+  List<ReleaseAlert> _releaseAlerts = [];
   bool _isLoading = true;
   bool _checking = false;
   Map<String, Game> _games = {};
@@ -61,6 +64,7 @@ class _AlertsScreenState extends State<AlertsScreen> {
   Future<void> _loadAlerts() async {
     final generation = ++_loadGeneration;
     final alerts = await widget.repository.getAlerts();
+    final releaseAlerts = await widget.repository.getReleaseAlerts();
     final games = <String, Game>{};
     for (final id in alerts.map((a) => a.gameId).toSet()) {
       try {
@@ -73,10 +77,119 @@ class _AlertsScreenState extends State<AlertsScreen> {
     if (mounted && generation == _loadGeneration) {
       setState(() {
         _alerts = alerts;
+        _releaseAlerts = releaseAlerts;
         _games = games;
         _isLoading = false;
       });
     }
+  }
+
+  Future<void> _openReleaseGame(ReleaseAlert alert) async {
+    try {
+      final page = await widget.repository
+          .searchOnline(alert.gameTitle, platform: alert.platform);
+      if (!mounted) return;
+      final matches = page.games.where((game) =>
+          game.platform == alert.platform &&
+          subscriptionTitleKey(game.title) ==
+              subscriptionTitleKey(alert.gameTitle));
+      if (matches.isNotEmpty) {
+        final match = matches.first;
+        final dated = Game.fromMap({
+          ...match.toMap(),
+          'releaseDate': alert.releaseDate.toIso8601String(),
+        }, editions: match.editions, beforeYouBuy: match.beforeYouBuy);
+        await Navigator.push(
+            context,
+            MaterialPageRoute<void>(
+                builder: (_) => GameDetailsScreen(
+                    game: dated, repository: widget.repository)));
+        return;
+      }
+    } catch (_) {}
+    if (!mounted) return;
+    final game = Game(
+        id: 'release_${alert.id}',
+        title: alert.gameTitle,
+        slug: alert.id,
+        coverUrl: alert.coverUrl,
+        platform: alert.platform,
+        consoles: const [],
+        genres: const [],
+        developer: '',
+        publisher: '',
+        releaseDate: alert.releaseDate);
+    await Navigator.push(
+        context,
+        MaterialPageRoute<void>(
+            builder: (_) =>
+                GameDetailsScreen(game: game, repository: widget.repository)));
+  }
+
+  Future<void> _toggleRelease(ReleaseAlert alert) async {
+    final scheduled = await widget.repository.toggleReleaseAlertActive(alert);
+    await _loadAlerts();
+    if (!scheduled && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text(
+              'Alerta guardada, pero Android no permitió programar el aviso.')));
+    }
+  }
+
+  Future<void> _deleteRelease(ReleaseAlert alert) async {
+    final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (_) => AlertDialog(
+              title: const Text('Eliminar aviso de lanzamiento'),
+              content: Text('¿Eliminar el aviso de ${alert.gameTitle}?'),
+              actions: [
+                TextButton(
+                    onPressed: () => Navigator.pop(context, false),
+                    child: const Text('Cancelar')),
+                TextButton(
+                    onPressed: () => Navigator.pop(context, true),
+                    child: const Text('Eliminar')),
+              ],
+            ));
+    if (confirmed == true) {
+      await widget.repository.deleteReleaseAlert(alert);
+      await _loadAlerts();
+    }
+  }
+
+  Widget _releaseCard(ReleaseAlert alert) {
+    final days = alert.daysRemaining(DateTime.now());
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(color: AppTheme.platformColor(alert.platform))),
+      child: ListTile(
+        onTap: () => _openReleaseGame(alert),
+        leading: SizedBox(
+            width: 52,
+            height: 72,
+            child: alert.coverUrl.isEmpty
+                ? const Icon(Icons.sports_esports)
+                : Image.network(alert.coverUrl,
+                    fit: BoxFit.cover,
+                    cacheWidth: 156,
+                    errorBuilder: (_, __, ___) =>
+                        const Icon(Icons.sports_esports))),
+        title: Text(alert.gameTitle),
+        subtitle: Text('Aviso de lanzamiento · '
+            '${days > 0 ? 'Faltan $days días' : days == 0 ? 'Sale hoy' : 'Fecha anunciada transcurrida'}\n'
+            '${DateFormatter.formatShortDate(alert.releaseDate)} · ${alert.platform.name}'),
+        trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+          Switch(
+              value: alert.isActive, onChanged: (_) => _toggleRelease(alert)),
+          IconButton(
+              tooltip: 'Eliminar aviso de lanzamiento',
+              onPressed: () => _deleteRelease(alert),
+              icon: const Icon(Icons.delete_outline)),
+        ]),
+      ),
+    );
   }
 
   void _openGame(UserAlert alert) {
@@ -158,7 +271,7 @@ class _AlertsScreenState extends State<AlertsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Mis Alertas de Precios'),
+        title: const Text('Mis Alertas'),
         actions: [
           IconButton(
               tooltip: 'Consultar precios ahora',
@@ -193,7 +306,7 @@ class _AlertsScreenState extends State<AlertsScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Alertas de precio activas',
+                        'Avisos de precios y lanzamientos',
                         style: TextStyle(
                           color: AppTheme.textPrimary,
                           fontSize: 12,
@@ -202,7 +315,7 @@ class _AlertsScreenState extends State<AlertsScreen> {
                       ),
                       SizedBox(height: 3),
                       Text(
-                        'Android revisa los juegos con conexión aproximadamente cada 15 minutos, incluso en segundo plano. El sistema puede retrasar la revisión. Pulsa actualizar para consultar ahora. Los avisos necesitan permiso y respetan el silencio de 22:00 a 08:00.',
+                        'Android consulta los precios en segundo plano con conexión; el sistema puede retrasar la revisión. Los lanzamientos se programan para un día antes y la fecha anunciada. Activa el permiso de notificaciones.',
                         style: TextStyle(
                             color: AppTheme.textSecondary,
                             fontSize: 11,
@@ -219,17 +332,20 @@ class _AlertsScreenState extends State<AlertsScreen> {
           Expanded(
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
-                : _alerts.isEmpty
+                : _alerts.isEmpty && _releaseAlerts.isEmpty
                     ? const EmptyStateView(
                         icon: Icons.notifications_off_outlined,
                         title: 'No tienes alertas activas',
                         message:
-                            'Entra a la ficha de un juego y toca "Crear Alerta" para guardar tu precio objetivo.',
+                            'Crea una alerta de precio desde una ficha o un aviso de salida desde Preventas.',
                       )
                     : ListView.builder(
-                        itemCount: _alerts.length,
+                        itemCount: _releaseAlerts.length + _alerts.length,
                         itemBuilder: (context, index) {
-                          final alert = _alerts[index];
+                          if (index < _releaseAlerts.length) {
+                            return _releaseCard(_releaseAlerts[index]);
+                          }
+                          final alert = _alerts[index - _releaseAlerts.length];
                           return Card(
                             shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12),

@@ -4,6 +4,7 @@ import 'package:dinoxo_gamers/data/repositories/game_repository.dart';
 import 'package:dinoxo_gamers/domain/models/game.dart';
 import 'package:dinoxo_gamers/domain/models/user_alert.dart';
 import 'package:dinoxo_gamers/domain/models/price_observation.dart';
+import 'package:dinoxo_gamers/domain/models/release_alert.dart';
 
 class TestRepository extends GameRepository {
   @override
@@ -11,9 +12,15 @@ class TestRepository extends GameRepository {
           {GamePlatform? platform, int page = 1}) async =>
       const LiveCatalogPage([]);
   @override
+  Future<List<String>> fetchAutocomplete(String query,
+          {GamePlatform? platform}) async =>
+      [];
+  @override
   Future<List<Game>> getFavoriteGames() async => [];
   @override
   Future<List<UserAlert>> getAlerts() async => [];
+  @override
+  Future<List<ReleaseAlert>> getReleaseAlerts() async => [];
   @override
   Future<Game?> getGameById(String id) async => null;
   @override

@@ -1,5 +1,8 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:timezone/timezone.dart' as tz;
 import '../models/user_alert.dart';
+import '../models/release_alert.dart';
+import '../../core/constants/app_constants.dart';
 
 class NotificationService {
   NotificationService._();
@@ -11,6 +14,70 @@ class NotificationService {
 
   // Duplicate prevention cache
   final Map<String, DateTime> _recentlyDispatchedAlerts = {};
+
+  static int _releaseNotificationId(String id, int kind) {
+    var hash = 2166136261;
+    for (final character in id.codeUnits) {
+      hash = ((hash ^ character) * 16777619) & 0x3fffffff;
+    }
+    return (hash * 2 + kind) & 0x7fffffff;
+  }
+
+  static DateTime releaseNotificationTime(DateTime releaseDate,
+          {required bool dayBefore}) =>
+      DateTime(releaseDate.year, releaseDate.month,
+          releaseDate.day - (dayBefore ? 1 : 0), 9);
+
+  Future<void> cancelReleaseAlert(ReleaseAlert alert) async {
+    if (!_isInitialized) await initialize();
+    await _notificationsPlugin.cancel(_releaseNotificationId(alert.id, 0));
+    await _notificationsPlugin.cancel(_releaseNotificationId(alert.id, 1));
+  }
+
+  /// Android stores these alarms, so they can appear when Flutter is not running.
+  Future<void> scheduleReleaseAlert(ReleaseAlert alert) async {
+    if (!_isInitialized) await initialize();
+    if (!_isInitialized) throw StateError('Notificaciones no disponibles.');
+    await cancelReleaseAlert(alert);
+    if (!alert.isActive) return;
+    const details = NotificationDetails(
+        android: AndroidNotificationDetails(
+            'dinoxo_gamers_releases', 'Lanzamientos Dinoxo',
+            channelDescription:
+                'Avisos un día antes y en la fecha anunciada de salida.',
+            importance: Importance.high,
+            priority: Priority.high,
+            icon: 'ic_stat_price_alert'));
+    final now = DateTime.now();
+    final dayBefore =
+        releaseNotificationTime(alert.releaseDate, dayBefore: true);
+    final releaseDay =
+        releaseNotificationTime(alert.releaseDate, dayBefore: false);
+    if (dayBefore.isAfter(now)) {
+      await _notificationsPlugin.zonedSchedule(
+          _releaseNotificationId(alert.id, 0),
+          'Mañana sale ${alert.gameTitle}',
+          'Falta un día para la fecha anunciada en ${AppConstants.platformDisplayName(alert.platform)}.',
+          tz.TZDateTime.from(dayBefore.toUtc(), tz.UTC),
+          details,
+          androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+          uiLocalNotificationDateInterpretation:
+              UILocalNotificationDateInterpretation.absoluteTime,
+          payload: 'release:${alert.id}');
+    }
+    if (releaseDay.isAfter(now)) {
+      await _notificationsPlugin.zonedSchedule(
+          _releaseNotificationId(alert.id, 1),
+          'Hoy sale ${alert.gameTitle}',
+          'Llegó la fecha anunciada de lanzamiento. Comprueba la tienda USA.',
+          tz.TZDateTime.from(releaseDay.toUtc(), tz.UTC),
+          details,
+          androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+          uiLocalNotificationDateInterpretation:
+              UILocalNotificationDateInterpretation.absoluteTime,
+          payload: 'release:${alert.id}');
+    }
+  }
 
   Future<void> initialize() async {
     if (_isInitialized) return;

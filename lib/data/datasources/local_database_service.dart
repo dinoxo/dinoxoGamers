@@ -1,17 +1,21 @@
 import 'dart:convert';
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
+import '../../core/constants/app_constants.dart';
 import '../../domain/models/user_alert.dart';
 import '../../domain/models/game.dart';
 import '../../domain/models/game_edition.dart';
 import '../../domain/models/price_observation.dart';
+import '../../domain/models/release_alert.dart';
 
 class LocalDatabaseService {
   LocalDatabaseService._();
   LocalDatabaseService.withDatabase(Database database) : _db = database;
+  LocalDatabaseService.withPath(String path) : _databasePathOverride = path;
   static final LocalDatabaseService instance = LocalDatabaseService._();
 
   Database? _db;
+  String? _databasePathOverride;
   Future<Database>? _opening;
 
   Future<Database> get database async {
@@ -26,12 +30,12 @@ class LocalDatabaseService {
   }
 
   Future<Database> _initDb() async {
-    final databasesPath = await getDatabasesPath();
-    final path = join(databasesPath, 'dinoxo_gamers.db');
+    final path = _databasePathOverride ??
+        join(await getDatabasesPath(), 'dinoxo_gamers.db');
 
     return await openDatabase(
       path,
-      version: 1,
+      version: 2,
       onCreate: (db, version) async {
         // Table: Favorites
         await db.execute('''
@@ -76,8 +80,73 @@ class LocalDatabaseService {
             value TEXT NOT NULL
           )
         ''');
+        await _createReleaseAlerts(db);
+      },
+      onUpgrade: (db, oldVersion, newVersion) async {
+        if (oldVersion < 2) await _createReleaseAlerts(db);
       },
     );
+  }
+
+  static Future<void> _createReleaseAlerts(DatabaseExecutor db) =>
+      db.execute('''
+    CREATE TABLE IF NOT EXISTS release_alerts (
+      id TEXT PRIMARY KEY,
+      game_title TEXT NOT NULL,
+      platform TEXT NOT NULL,
+      cover_url TEXT NOT NULL,
+      source_url TEXT NOT NULL,
+      release_date TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      is_active INTEGER NOT NULL DEFAULT 1
+    )
+  ''');
+
+  Future<List<ReleaseAlert>> getReleaseAlerts() async {
+    final rows = await (await database)
+        .query('release_alerts', orderBy: 'created_at DESC');
+    return rows
+        .map((row) => ReleaseAlert(
+            id: row['id'] as String,
+            gameTitle: row['game_title'] as String,
+            platform: GamePlatform.values
+                .firstWhere((p) => p.name == row['platform']),
+            coverUrl: row['cover_url'] as String,
+            sourceUrl: row['source_url'] as String,
+            releaseDate: DateTime.parse(row['release_date'] as String),
+            createdAt: DateTime.parse(row['created_at'] as String),
+            isActive: row['is_active'] == 1))
+        .toList();
+  }
+
+  Future<void> saveReleaseAlert(ReleaseAlert alert) async {
+    await (await database).insert(
+        'release_alerts',
+        {
+          'id': alert.id,
+          'game_title': alert.gameTitle,
+          'platform': alert.platform.name,
+          'cover_url': alert.coverUrl,
+          'source_url': alert.sourceUrl,
+          'release_date':
+              '${alert.releaseDate.year.toString().padLeft(4, '0')}-'
+                  '${alert.releaseDate.month.toString().padLeft(2, '0')}-'
+                  '${alert.releaseDate.day.toString().padLeft(2, '0')}',
+          'created_at': alert.createdAt.toIso8601String(),
+          'is_active': alert.isActive ? 1 : 0,
+        },
+        conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  Future<void> deleteReleaseAlert(String id) async {
+    await (await database)
+        .delete('release_alerts', where: 'id = ?', whereArgs: [id]);
+  }
+
+  Future<void> setReleaseAlertActive(String id, bool active) async {
+    await (await database).update(
+        'release_alerts', {'is_active': active ? 1 : 0},
+        where: 'id = ?', whereArgs: [id]);
   }
 
   // --- FAVORITES ---
