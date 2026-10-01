@@ -8,11 +8,10 @@ import '../../domain/models/release_alert.dart';
 import '../../domain/models/preorder_game.dart';
 import '../../domain/services/notification_service.dart';
 import '../../domain/services/subscription_service.dart';
-import '../core/widgets/usa_badge.dart';
 import '../features/alerts/alerts_screen.dart';
 import '../features/deals/deals_screen.dart';
+import '../features/news/news_screen.dart';
 import '../features/preorders/preorders_screen.dart';
-import '../features/library/library_screen.dart';
 import '../features/search/search_screen.dart';
 import '../features/store/dinoxo_store_screen.dart';
 import '../features/subscriptions/plus_screen.dart';
@@ -54,6 +53,7 @@ class _MainShellState extends State<MainShell> {
       PreordersScreen(
           repository: widget.repository,
           onCreateReleaseAlert: _createReleaseAlert),
+      const NewsScreen(),
       AlertsScreen(repository: widget.repository),
       const DinoxoStoreScreen(),
     ];
@@ -269,156 +269,9 @@ class _MainShellState extends State<MainShell> {
     );
   }
 
-  void _showInfoDialog() {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppTheme.surfaceElevated,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Row(
-          children: [
-            Icon(Icons.sports_esports, color: AppTheme.primaryLight),
-            SizedBox(width: 8),
-            Text(
-              'Dinoxo Gamers',
-              style: TextStyle(
-                  color: AppTheme.textPrimary, fontWeight: FontWeight.w800),
-            ),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Versión ${AppConstants.appVersion} · Edición Gratuita Universal',
-              style: TextStyle(
-                  color: AppTheme.secondary,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: 10),
-            const Text(
-              'Aplicación diseñada para la comunidad gamer. Permite consultar ofertas verificadas en PlayStation, Nintendo y Xbox para la región comercial de Estados Unidos (USD), analizar históricos y estimaciones, y adquirir saldo oficial en Dinoxo Store.',
-              style: TextStyle(
-                  color: AppTheme.textSecondary, fontSize: 12, height: 1.35),
-            ),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: AppTheme.surfaceSubtle,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Row(
-                children: [
-                  Icon(Icons.check_circle_outline,
-                      color: AppTheme.success, size: 16),
-                  SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'App 100% libre de licencias, pruebas y pagos por desbloqueo.',
-                      style: TextStyle(
-                          color: AppTheme.textPrimary,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cerrar'),
-          ),
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      drawer: Drawer(
-        backgroundColor: AppTheme.surfaceElevated,
-        child: ListView(
-          padding: EdgeInsets.zero,
-          children: [
-            DrawerHeader(
-              decoration: const BoxDecoration(
-                color: AppTheme.background,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: AppTheme.primary.withAlpha(50),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Icon(Icons.sports_esports,
-                        color: AppTheme.primaryLight, size: 30),
-                  ),
-                  const SizedBox(height: 10),
-                  const Text(
-                    AppConstants.appName,
-                    style: TextStyle(
-                      color: AppTheme.textPrimary,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  const Text(
-                    'PlayStation · Nintendo · Xbox (USA)',
-                    style:
-                        TextStyle(color: AppTheme.textSecondary, fontSize: 11),
-                  ),
-                ],
-              ),
-            ),
-            ListTile(
-              leading: const Icon(Icons.inventory_2_outlined,
-                  color: AppTheme.secondary),
-              title: const Text('Mi Biblioteca de Juegos',
-                  style: TextStyle(color: AppTheme.textPrimary)),
-              subtitle: const Text(
-                  'Juegos que ya posees y comparador de ediciones',
-                  style: TextStyle(color: AppTheme.textMuted, fontSize: 11)),
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) =>
-                        LibraryScreen(repository: widget.repository),
-                  ),
-                );
-              },
-            ),
-            ListTile(
-              leading:
-                  const Icon(Icons.info_outline, color: AppTheme.primaryLight),
-              title: const Text('Acerca de Dinoxo Gamers',
-                  style: TextStyle(color: AppTheme.textPrimary)),
-              onTap: () {
-                Navigator.pop(context);
-                _showInfoDialog();
-              },
-            ),
-            const Divider(color: AppTheme.border),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: UsaBadge(),
-            ),
-          ],
-        ),
-      ),
       body: IndexedStack(
         index: _currentIndex,
         children: [
@@ -456,6 +309,11 @@ class _MainShellState extends State<MainShell> {
             icon: Icon(Icons.event_outlined),
             activeIcon: Icon(Icons.event),
             label: 'Preventas',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.newspaper_outlined),
+            activeIcon: Icon(Icons.newspaper),
+            label: 'Noticias',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.notifications_none),

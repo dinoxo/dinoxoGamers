@@ -14,6 +14,7 @@ import '../../../domain/models/game.dart';
 import '../../core/widgets/deal_card.dart';
 import '../../core/widgets/live_game_autocomplete.dart';
 import '../game_details/game_details_screen.dart';
+import '../library/library_screen.dart';
 
 class SearchScreen extends StatefulWidget {
   final GameRepository repository;
@@ -405,12 +406,121 @@ class _SearchScreenState extends State<SearchScreen> {
           data: AppTheme.forPlatform(Theme.of(context), _platform!),
           child: Builder(builder: _buildPage));
 
+  void _showInfoDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppTheme.surfaceElevated,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.sports_esports, color: AppTheme.primaryLight),
+            SizedBox(width: 8),
+            Text(
+              'Dinoxo Gamers',
+              style: TextStyle(
+                  color: AppTheme.textPrimary, fontWeight: FontWeight.w800),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Versión ${AppConstants.appVersion} · Edición Gratuita Universal',
+              style: TextStyle(
+                  color: AppTheme.secondary,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 10),
+            const Text(
+              'Aplicación diseñada para la comunidad gamer. Permite consultar ofertas verificadas en PlayStation, Nintendo y Xbox para la región comercial de Estados Unidos (USD), analizar históricos y estimaciones, y adquirir saldo oficial en Dinoxo Store.',
+              style: TextStyle(
+                  color: AppTheme.textSecondary, fontSize: 12, height: 1.35),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: AppTheme.surfaceSubtle,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.check_circle_outline,
+                      color: AppTheme.success, size: 16),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'App 100% libre de licencias, pruebas y pagos por desbloqueo.',
+                      style: TextStyle(
+                          color: AppTheme.textPrimary,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cerrar'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildPage(BuildContext context) => Scaffold(
         appBar: AppBar(title: const Text('Buscar Juegos'), actions: [
           IconButton(
               tooltip: 'Configurar análisis de fotos',
               onPressed: _readingPhoto ? null : _showPhotoSettings,
               icon: const Icon(Icons.auto_awesome_outlined)),
+          PopupMenuButton<String>(
+              tooltip: 'Menú Dinoxo',
+              icon: const Icon(Icons.menu),
+              onSelected: (value) {
+                if (value == 'library') {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) =>
+                          LibraryScreen(repository: widget.repository),
+                    ),
+                  );
+                } else if (value == 'about') {
+                  _showInfoDialog(context);
+                }
+              },
+              itemBuilder: (ctx) => [
+                const PopupMenuItem(
+                  value: 'library',
+                  child: Row(
+                    children: [
+                      Icon(Icons.inventory_2_outlined,
+                          color: AppTheme.secondary),
+                      SizedBox(width: 12),
+                      Text('Mi Biblioteca de Juegos'),
+                    ],
+                  ),
+                ),
+                const PopupMenuItem(
+                  value: 'about',
+                  child: Row(
+                    children: [
+                      Icon(Icons.info_outline, color: AppTheme.primaryLight),
+                      SizedBox(width: 12),
+                      Text('Acerca de Dinoxo Gamers'),
+                    ],
+                  ),
+                ),
+              ]),
           IconButton(
               tooltip: 'Leer título con la cámara',
               onPressed:

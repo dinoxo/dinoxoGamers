@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../../core/constants/app_constants.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../data/datasources/web_scraper_service.dart';
 import '../../../data/repositories/game_repository.dart';
 import '../../../domain/models/game.dart';
@@ -114,7 +115,13 @@ class _DealsScreenState extends State<DealsScreen> {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => _platform == null
+      ? _buildPage(context)
+      : Theme(
+          data: AppTheme.forPlatform(Theme.of(context), _platform!),
+          child: Builder(builder: _buildPage));
+
+  Widget _buildPage(BuildContext context) {
     var games = _games
         .where((g) => _maxPrice == null || g.currentPrice <= _maxPrice!)
         .toList();

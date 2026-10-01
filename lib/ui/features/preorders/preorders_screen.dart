@@ -34,8 +34,77 @@ class _PreordersScreenState extends State<PreordersScreen> {
   bool _loading = true;
   bool _hasMore = false;
   String? _error;
+  GamePlatform? _platform;
   List<PreorderGame> _games = [];
   List<String> _suggestions = [];
+
+  static int _gamePriority(PreorderGame game) {
+    final title = game.title.toLowerCase();
+    if (title.contains('grand theft auto vi') ||
+        title.contains('gta 6') ||
+        title.contains('gta vi') ||
+        title.contains('grand theft auto 6')) {
+      return 100;
+    }
+    if (title.contains('zelda') || title.contains('ocarina of time')) {
+      return 95;
+    }
+    if (title.contains('metroid prime 4') || title.contains('beyond')) {
+      return 90;
+    }
+    if (title.contains('monster hunter wilds')) {
+      return 88;
+    }
+    if (title.contains('ghost of yōtei') || title.contains('ghost of yotei')) {
+      return 86;
+    }
+    if (title.contains('doom: the dark ages') ||
+        title.contains('doom the dark ages')) {
+      return 85;
+    }
+    if (title.contains('death stranding 2')) {
+      return 84;
+    }
+    if (title.contains('wolverine') || title.contains("marvel's wolverine")) {
+      return 83;
+    }
+    if (title.contains('fable')) {
+      return 82;
+    }
+    if (title.contains('gears of war: e-day') ||
+        title.contains('gears of war')) {
+      return 81;
+    }
+    if (title.contains('pokemon') || title.contains('pokémon')) {
+      return 80;
+    }
+    if (title.contains('mario') || title.contains('donkey kong')) {
+      return 78;
+    }
+    if (title.contains('witcher') || title.contains('cyberpunk')) {
+      return 75;
+    }
+    if (title.contains('elder scrolls') || title.contains('fallout')) {
+      return 74;
+    }
+    return 0;
+  }
+
+  static List<PreorderGame> _sortedGames(List<PreorderGame> list) {
+    final copy = List<PreorderGame>.from(list);
+    copy.sort((a, b) {
+      final pA = _gamePriority(a);
+      final pB = _gamePriority(b);
+      if (pA != pB) return pB.compareTo(pA);
+      final dateA = a.releaseDate;
+      final dateB = b.releaseDate;
+      if (dateA != null && dateB != null) return dateA.compareTo(dateB);
+      if (dateA != null) return -1;
+      if (dateB != null) return 1;
+      return a.title.compareTo(b.title);
+    });
+    return copy;
+  }
 
   @override
   void initState() {
@@ -226,16 +295,28 @@ class _PreordersScreenState extends State<PreordersScreen> {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => _platform == null
+      ? _buildPage(context)
+      : Theme(
+          data: AppTheme.forPlatform(Theme.of(context), _platform!),
+          child: Builder(builder: _buildPage));
+
+  Widget _buildPage(BuildContext context) {
+    final activeGames = _platform == null
+        ? _games
+        : _games.where((game) => game.platform == _platform).toList();
+    final sorted = _sortedGames(activeGames);
+    final platformsToShow =
+        _platform == null ? GamePlatform.values : [_platform!];
     final grouped = <GamePlatform, List<PreorderGame>>{
-      for (final platform in GamePlatform.values)
-        platform: _games.where((game) => game.platform == platform).toList(),
+      for (final platform in platformsToShow)
+        platform: sorted.where((game) => game.platform == platform).toList(),
     };
     return Scaffold(
       appBar: AppBar(title: const Text('Preventas')),
       body: Column(children: [
         Padding(
-          padding: const EdgeInsets.all(14),
+          padding: const EdgeInsets.fromLTRB(14, 14, 14, 6),
           child: TextField(
             controller: _search,
             onChanged: _onSearchChanged,
@@ -249,6 +330,22 @@ class _PreordersScreenState extends State<PreordersScreen> {
             ),
           ),
         ),
+        SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+            child: Row(children: [
+              for (final p in <GamePlatform?>[null, ...GamePlatform.values])
+                Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: ChoiceChip(
+                        label: Text(p == null
+                            ? 'Todas'
+                            : AppConstants.platformDisplayName(p)),
+                        selected: p == _platform,
+                        onSelected: (_) {
+                          setState(() => _platform = p);
+                        })),
+            ])),
         if (_suggestions.isNotEmpty)
           ConstrainedBox(
             constraints: const BoxConstraints(maxHeight: 180),
@@ -282,7 +379,7 @@ class _PreordersScreenState extends State<PreordersScreen> {
                       padding: const EdgeInsets.all(16),
                       child: Text(_error!,
                           style: const TextStyle(color: AppTheme.warning))),
-                for (final platform in GamePlatform.values)
+                for (final platform in platformsToShow)
                   if (grouped[platform]!.isNotEmpty) ...[
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 18, 16, 6),
@@ -294,7 +391,7 @@ class _PreordersScreenState extends State<PreordersScreen> {
                     ),
                     ...grouped[platform]!.map(_card),
                   ],
-                if (!_loading && _games.isEmpty && _error == null)
+                if (!_loading && sorted.isEmpty && _error == null)
                   const Padding(
                       padding: EdgeInsets.all(24),
                       child: Text(
