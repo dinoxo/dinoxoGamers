@@ -14,7 +14,8 @@ import '../../../domain/models/game.dart';
 import '../../core/widgets/deal_card.dart';
 import '../../core/widgets/live_game_autocomplete.dart';
 import '../game_details/game_details_screen.dart';
-import '../library/library_screen.dart';
+import '../../core/widgets/gaming_header.dart';
+import '../../core/widgets/platform_filter.dart';
 
 class SearchScreen extends StatefulWidget {
   final GameRepository repository;
@@ -406,222 +407,128 @@ class _SearchScreenState extends State<SearchScreen> {
           data: AppTheme.forPlatform(Theme.of(context), _platform!),
           child: Builder(builder: _buildPage));
 
-  void _showInfoDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppTheme.surfaceElevated,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Row(
-          children: [
-            Icon(Icons.sports_esports, color: AppTheme.primaryLight),
-            SizedBox(width: 8),
-            Text(
-              'Dinoxo Gamers',
-              style: TextStyle(
-                  color: AppTheme.textPrimary, fontWeight: FontWeight.w800),
-            ),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Versión ${AppConstants.appVersion} · Edición Gratuita Universal',
-              style: TextStyle(
-                  color: AppTheme.secondary,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: 10),
-            const Text(
-              'Aplicación diseñada para la comunidad gamer. Permite consultar ofertas verificadas en PlayStation, Nintendo y Xbox para la región comercial de Estados Unidos (USD), analizar históricos y estimaciones, y adquirir saldo oficial en Dinoxo Store.',
-              style: TextStyle(
-                  color: AppTheme.textSecondary, fontSize: 12, height: 1.35),
-            ),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: AppTheme.surfaceSubtle,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Row(
-                children: [
-                  Icon(Icons.check_circle_outline,
-                      color: AppTheme.success, size: 16),
-                  SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'App 100% libre de licencias, pruebas y pagos por desbloqueo.',
-                      style: TextStyle(
-                          color: AppTheme.textPrimary,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cerrar'),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildPage(BuildContext context) => Scaffold(
-        appBar: AppBar(title: const Text('Buscar Juegos'), actions: [
-          IconButton(
-              tooltip: 'Configurar análisis de fotos',
-              onPressed: _readingPhoto ? null : _showPhotoSettings,
-              icon: const Icon(Icons.auto_awesome_outlined)),
-          PopupMenuButton<String>(
-              tooltip: 'Menú Dinoxo',
-              icon: const Icon(Icons.menu),
-              onSelected: (value) {
-                if (value == 'library') {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) =>
-                          LibraryScreen(repository: widget.repository),
-                    ),
-                  );
-                } else if (value == 'about') {
-                  _showInfoDialog(context);
-                }
-              },
-              itemBuilder: (ctx) => [
-                const PopupMenuItem(
-                  value: 'library',
-                  child: Row(
-                    children: [
-                      Icon(Icons.inventory_2_outlined,
-                          color: AppTheme.secondary),
-                      SizedBox(width: 12),
-                      Text('Mi Biblioteca de Juegos'),
-                    ],
-                  ),
-                ),
-                const PopupMenuItem(
-                  value: 'about',
-                  child: Row(
-                    children: [
-                      Icon(Icons.info_outline, color: AppTheme.primaryLight),
-                      SizedBox(width: 12),
-                      Text('Acerca de Dinoxo Gamers'),
-                    ],
-                  ),
-                ),
-              ]),
-          IconButton(
-              tooltip: 'Leer título con la cámara',
-              onPressed:
-                  _readingPhoto ? null : () => _photo(ImageSource.camera),
-              icon: const Icon(Icons.camera_alt_outlined)),
-          IconButton(
-              tooltip: 'Leer título de una imagen',
-              onPressed:
-                  _readingPhoto ? null : () => _photo(ImageSource.gallery),
-              icon: const Icon(Icons.photo_outlined)),
-        ]),
-        body: Column(children: [
-          Padding(
-              padding: const EdgeInsets.all(12),
-              child: LiveGameAutocomplete(
-                key: ValueKey('search_${_platform?.name ?? 'all'}'),
-                controller: _controller,
-                hintText: 'Escribe Tu Juego',
-                suggestions: (query) => widget.repository
-                    .fetchAutocomplete(query, platform: _platform),
-                onSelected: (selection) {
-                  _controller.text = selection;
-                  _search();
-                },
-                onChanged: _changed,
-                onSubmitted: (_) => _search(),
-              )),
-          SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: Row(children: [
-                for (final p in <GamePlatform?>[null, ...GamePlatform.values])
+        appBar: GamingHeader.adaptive(context,
+            title: 'Buscar Juegos',
+            subtitle: 'Encuentra tu próxima aventura en las tiendas USA.',
+            accent: _platform == null
+                ? AppTheme.secondary
+                : AppTheme.platformColor(_platform!),
+            actions: [
+              IconButton(
+                  tooltip: 'Configurar análisis de fotos',
+                  onPressed: _readingPhoto ? null : _showPhotoSettings,
+                  icon: const Icon(Icons.auto_awesome_outlined)),
+              IconButton(
+                  tooltip: 'Leer título con la cámara',
+                  onPressed:
+                      _readingPhoto ? null : () => _photo(ImageSource.camera),
+                  icon: const Icon(Icons.camera_alt_outlined)),
+              IconButton(
+                  tooltip: 'Leer título de una imagen',
+                  onPressed:
+                      _readingPhoto ? null : () => _photo(ImageSource.gallery),
+                  icon: const Icon(Icons.photo_outlined)),
+            ]),
+        body: RefreshIndicator(
+            onRefresh: () => _search(),
+            child: CustomScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              slivers: [
+                SliverToBoxAdapter(
+                    child: Column(children: [
                   Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: ChoiceChip(
-                          label: Text(p == null
-                              ? 'Todas'
-                              : AppConstants.platformDisplayName(p)),
-                          selected: p == _platform,
-                          onSelected: (_) {
-                            setState(() => _platform = p);
-                            _changed(_controller.text);
-                          })),
-              ])),
-          const Padding(
-              padding: EdgeInsets.all(8),
-              child: Text('USA · USD · Consulta web en Deku Deals')),
-          if (_busy || _readingPhoto) const LinearProgressIndicator(),
-          if (_error != null)
-            Padding(
-                padding: const EdgeInsets.all(12),
-                child: Text(_error!, key: const Key('search-error'))),
-          if (_warning != null)
-            Padding(padding: const EdgeInsets.all(8), child: Text(_warning!)),
-          Expanded(
-              child: RefreshIndicator(
-                  onRefresh: () => _search(),
-                  child: ListView(
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      children: [
-                        if (_games.isEmpty && !_busy)
-                          Padding(
-                              padding: const EdgeInsets.all(24),
-                              child: Text(
-                                  _controller.text.trim().length < 2
-                                      ? 'Escribe al menos dos caracteres para buscar juegos en las tres consolas.'
-                                      : _error != null
-                                          ? 'La consulta no terminó. No equivale a que el juego no exista.'
-                                          : 'No hay precios o fichas disponibles en esta página. Puedes consultar más resultados.',
-                                  textAlign: TextAlign.center)),
-                        for (final game in _games)
-                          DealCard(
-                              game: game,
-                              isFavorite: _favorites.contains(game.id),
-                              onToggleFavorite: () async {
-                                await widget.repository.toggleFavorite(game.id);
-                                if (mounted) {
-                                  setState(() {
-                                    _favorites.contains(game.id)
-                                        ? _favorites.remove(game.id)
-                                        : _favorites.add(game.id);
-                                  });
-                                }
-                              },
-                              onTap: () => Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                      builder: (_) => GameDetailsScreen(
-                                          game: game,
-                                          repository: widget.repository)))),
-                        if (_hasMore && _error == null)
-                          TextButton(
-                              onPressed:
-                                  _busy ? null : () => _search(more: true),
-                              child: const Text('Cargar más resultados')),
-                        if (_error != null)
-                          TextButton(
-                              onPressed: _busy ? null : () => _search(),
-                              child: const Text('Reintentar búsqueda')),
-                        const SizedBox(height: 24),
-                      ]))),
-        ]),
+                      padding: const EdgeInsets.fromLTRB(14, 12, 14, 4),
+                      child: LiveGameAutocomplete(
+                        key: ValueKey('search_${_platform?.name ?? 'all'}'),
+                        controller: _controller,
+                        hintText: 'Escribe Tu Juego',
+                        suggestions: (query) => widget.repository
+                            .fetchAutocomplete(query, platform: _platform),
+                        onSelected: (selection) {
+                          _controller.text = selection;
+                          _search();
+                        },
+                        onChanged: _changed,
+                        onSubmitted: (_) => _search(),
+                      )),
+                  PlatformFilter(
+                      selected: _platform,
+                      onChanged: (p) {
+                        setState(() => _platform = p);
+                        _changed(_controller.text);
+                      }),
+                  const Padding(
+                      padding: EdgeInsets.all(8),
+                      child: Text('USA · USD · Consulta web en Deku Deals',
+                          style: TextStyle(
+                              color: AppTheme.textMuted, fontSize: 10))),
+                  if (_busy || _readingPhoto)
+                    const LinearProgressIndicator(minHeight: 2),
+                  if (_error != null)
+                    Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Text(_error!, key: const Key('search-error'))),
+                  if (_warning != null)
+                    Padding(
+                        padding: const EdgeInsets.all(8),
+                        child: Text(_warning!)),
+                  if (_games.isEmpty && !_busy)
+                    Padding(
+                        padding: const EdgeInsets.all(28),
+                        child: Column(children: [
+                          Icon(Icons.travel_explore_rounded,
+                              size: 42,
+                              color: AppTheme.secondary.withAlpha(160)),
+                          const SizedBox(height: 14),
+                          Text(
+                              _controller.text.trim().length < 2
+                                  ? 'Escribe al menos dos caracteres para buscar juegos en las tres consolas.'
+                                  : _error != null
+                                      ? 'La consulta no terminó. No equivale a que el juego no exista.'
+                                      : 'No hay precios o fichas disponibles en esta página. Puedes consultar más resultados.',
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                  color: AppTheme.textSecondary, fontSize: 13)),
+                        ])),
+                ])),
+                SliverList.builder(
+                    itemCount: _games.length,
+                    itemBuilder: (context, index) {
+                      final game = _games[index];
+                      return DealCard(
+                          game: game,
+                          isFavorite: _favorites.contains(game.id),
+                          onToggleFavorite: () async {
+                            await widget.repository.toggleFavorite(game.id);
+                            if (mounted) {
+                              setState(() {
+                                _favorites.contains(game.id)
+                                    ? _favorites.remove(game.id)
+                                    : _favorites.add(game.id);
+                              });
+                            }
+                          },
+                          onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (_) => GameDetailsScreen(
+                                      game: game,
+                                      repository: widget.repository))));
+                    }),
+                SliverToBoxAdapter(
+                    child: Column(children: [
+                  if (_hasMore && _error == null)
+                    TextButton(
+                        onPressed: _busy ? null : () => _search(more: true),
+                        child: const Text('Cargar más resultados')),
+                  if (_error != null)
+                    TextButton(
+                        onPressed: _busy ? null : () => _search(),
+                        child: const Text('Reintentar búsqueda')),
+                  const SizedBox(height: 24),
+                ])),
+              ],
+            )),
       );
 }

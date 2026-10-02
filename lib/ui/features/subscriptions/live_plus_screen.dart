@@ -9,6 +9,11 @@ import '../../../domain/services/subscription_service.dart';
 import '../../../data/repositories/game_repository.dart';
 import '../../../domain/models/game.dart';
 import '../game_details/game_details_screen.dart';
+import '../../core/widgets/gaming_header.dart';
+import '../../core/widgets/platform_filter.dart';
+import '../../core/widgets/game_card_frame.dart';
+import '../../core/widgets/platform_badge.dart';
+import '../../core/widgets/usa_badge.dart';
 
 class PlusScreen extends StatefulWidget {
   const PlusScreen(
@@ -26,6 +31,7 @@ class _PlusScreenState extends State<PlusScreen> {
   GamePlatform? _platform;
   SubscriptionCategory _category = SubscriptionCategory.all;
   String _query = '';
+  final _searchController = TextEditingController();
   Timer? _debounce;
   @override
   void initState() {
@@ -36,6 +42,7 @@ class _PlusScreenState extends State<PlusScreen> {
   @override
   void dispose() {
     _debounce?.cancel();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -98,151 +105,147 @@ class _PlusScreenState extends State<PlusScreen> {
           final showBenefits = _category == SubscriptionCategory.benefits;
           final rowCount = showBenefits ? benefits.length : items.length;
           return Scaffold(
-            appBar: AppBar(title: const Text('Plus & Suscripciones'), actions: [
-              IconButton(
-                  tooltip: 'Actualizar suscripciones',
-                  onPressed: service.loading ? null : service.refresh,
-                  icon: const Icon(Icons.refresh)),
-            ]),
-            body: Column(children: [
-              const Padding(
-                  padding: EdgeInsets.fromLTRB(14, 8, 14, 6),
-                  child: Text(
-                      'Estados Unidos · Comprueba tu nivel antes de comprar; la app no accede a tu membresía.')),
-              Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: TextField(
-                      onChanged: (query) {
-                        _debounce?.cancel();
-                        _debounce =
-                            Timer(const Duration(milliseconds: 250), () {
-                          if (mounted) setState(() => _query = query);
-                        });
-                      },
-                      decoration: const InputDecoration(
-                          hintText: 'Buscar en las suscripciones...',
-                          prefixIcon: Icon(Icons.search)))),
-              SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  child: Row(children: [
-                    for (final platform in <GamePlatform?>[
-                      null,
-                      ...GamePlatform.values
-                    ])
-                      Padding(
-                          padding: const EdgeInsets.only(right: 8),
-                          child: ChoiceChip(
-                              label: Text(platform == null
-                                  ? 'Todas'
-                                  : switch (platform) {
-                                      GamePlatform.playstation =>
-                                        'PlayStation Plus',
-                                      GamePlatform.xbox => 'Xbox Game Pass',
-                                      GamePlatform.nintendo =>
-                                        'Nintendo Switch Online',
-                                    }),
-                              selected: _platform == platform,
-                              selectedColor: platform == null
-                                  ? null
-                                  : AppTheme.platformColor(platform)
-                                      .withAlpha(55),
-                              onSelected: (_) => setState(() {
+            appBar: GamingHeader.adaptive(context,
+                title: 'Plus & Suscripciones',
+                subtitle: 'Descubre qué incluye tu membresía en USA.',
+                accent: _platform == null
+                    ? AppTheme.secondary
+                    : AppTheme.platformColor(_platform!),
+                actions: [
+                  IconButton(
+                      tooltip: 'Actualizar suscripciones',
+                      onPressed: service.loading ? null : service.refresh,
+                      icon: const Icon(Icons.refresh_rounded))
+                ]),
+            body: RefreshIndicator(
+                onRefresh: service.refresh,
+                child: CustomScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  key: ValueKey('${_platform?.name}_${_category.name}'),
+                  slivers: [
+                    SliverToBoxAdapter(
+                        child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                          Padding(
+                              padding: const EdgeInsets.fromLTRB(14, 12, 14, 4),
+                              child: TextField(
+                                  controller: _searchController,
+                                  onChanged: (query) {
+                                    _debounce?.cancel();
+                                    _debounce = Timer(
+                                        const Duration(milliseconds: 250), () {
+                                      if (mounted) {
+                                        setState(() => _query = query);
+                                      }
+                                    });
+                                  },
+                                  decoration: const InputDecoration(
+                                      hintText:
+                                          'Buscar en las suscripciones...',
+                                      prefixIcon: Icon(Icons.search)))),
+                          PlatformFilter(
+                              selected: _platform,
+                              memberships: true,
+                              onChanged: (platform) => setState(() {
                                     _platform = platform;
                                     _category = platform == null
                                         ? SubscriptionCategory.all
                                         : SubscriptionCategory.benefits;
-                                  }))),
-                  ])),
-              SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.all(12),
-                  child: Row(children: [
-                    for (final category in [
-                      SubscriptionCategory.all,
-                      SubscriptionCategory.monthly,
-                      SubscriptionCategory.upcoming,
-                      SubscriptionCategory.comingSoon,
-                      SubscriptionCategory.leavingSoon,
-                      SubscriptionCategory.benefits
-                    ])
-                      Padding(
-                          padding: const EdgeInsets.only(right: 8),
-                          child: ChoiceChip(
-                              label: Text(category.label),
-                              selected: _category == category,
-                              onSelected: (_) =>
-                                  setState(() => _category = category))),
-                  ])),
-              if (service.loading) const LinearProgressIndicator(),
-              Expanded(
-                  child: RefreshIndicator(
-                      onRefresh: service.refresh,
-                      child: ListView.builder(
-                        physics: const AlwaysScrollableScrollPhysics(),
-                        padding: const EdgeInsets.all(12),
-                        key: ValueKey('${_platform?.name}_${_category.name}'),
-                        itemCount: rowCount + 1,
+                                  })),
+                          SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 14, vertical: 4),
+                              child: Row(children: [
+                                for (final category in [
+                                  SubscriptionCategory.all,
+                                  SubscriptionCategory.monthly,
+                                  SubscriptionCategory.upcoming,
+                                  SubscriptionCategory.comingSoon,
+                                  SubscriptionCategory.leavingSoon,
+                                  SubscriptionCategory.benefits
+                                ])
+                                  Padding(
+                                      padding: const EdgeInsets.only(right: 6),
+                                      child: ChoiceChip(
+                                          label: Text(category.label,
+                                              style: const TextStyle(
+                                                  fontSize: 11)),
+                                          selected: _category == category,
+                                          onSelected: (_) => setState(
+                                              () => _category = category))),
+                              ])),
+                          const Padding(
+                              padding: EdgeInsets.fromLTRB(16, 4, 16, 8),
+                              child: Text(
+                                  'Estados Unidos · Comprueba tu nivel antes de comprar; la app no accede a tu membresía.',
+                                  style: TextStyle(
+                                      fontSize: 10,
+                                      color: AppTheme.textSecondary))),
+                          if (service.loading)
+                            const LinearProgressIndicator(minHeight: 2),
+                          for (final platform in platforms) ...[
+                            if (service.errors[platform] != null)
+                              Padding(
+                                  padding: const EdgeInsets.all(14),
+                                  child: Text(service.errors[platform]!,
+                                      style: const TextStyle(
+                                          color: AppTheme.warning,
+                                          fontSize: 12))),
+                            if (service.checkedAt[platform] != null)
+                              Padding(
+                                  padding:
+                                      const EdgeInsets.fromLTRB(16, 2, 16, 6),
+                                  child: Text(
+                                      '${AppConstants.platformDisplayName(platform)} · última consulta ${DateFormatter.formatShortDate(service.checkedAt[platform]!)}',
+                                      style: const TextStyle(
+                                          fontSize: 10,
+                                          color: AppTheme.textMuted))),
+                            for (final notice
+                                in service.notices[platform] ?? <String>[])
+                              Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 16, vertical: 4),
+                                  child: Text(notice,
+                                      style: const TextStyle(
+                                          fontSize: 11,
+                                          color: AppTheme.warning))),
+                          ],
+                          if (rowCount == 0 && !service.loading)
+                            Padding(
+                                padding: const EdgeInsets.all(24),
+                                child: Text(_emptyMessage,
+                                    textAlign: TextAlign.center)),
+                        ])),
+                    SliverList.builder(
+                        itemCount: rowCount,
                         itemBuilder: (context, index) {
-                          if (index == 0) {
-                            return Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  for (final platform in platforms) ...[
-                                    if (service.errors[platform] != null)
-                                      Padding(
-                                          padding: const EdgeInsets.all(8),
-                                          child: Text(service.errors[platform]!,
-                                              style: const TextStyle(
-                                                  color: AppTheme.warning))),
-                                    if (service.checkedAt[platform] != null)
-                                      Padding(
-                                          padding:
-                                              const EdgeInsets.only(bottom: 8),
-                                          child: Text(
-                                              '${AppConstants.platformDisplayName(platform)} · última consulta ${DateFormatter.formatShortDate(service.checkedAt[platform]!)}',
-                                              style: const TextStyle(
-                                                  fontSize: 11,
-                                                  color: AppTheme.textMuted))),
-                                    for (final notice
-                                        in service.notices[platform] ??
-                                            <String>[])
-                                      Padding(
-                                          padding:
-                                              const EdgeInsets.only(bottom: 8),
-                                          child: Text(notice,
-                                              style: const TextStyle(
-                                                  fontSize: 11,
-                                                  color: AppTheme.warning))),
-                                  ],
-                                  if (rowCount == 0 && !service.loading)
-                                    Padding(
-                                        padding: const EdgeInsets.all(24),
-                                        child: Text(_emptyMessage,
-                                            textAlign: TextAlign.center)),
-                                ]);
-                          }
                           if (showBenefits) {
-                            return _BenefitsCard(
-                                plan: benefits[index - 1],
-                                onOpen: () => Navigator.push(
-                                    context,
-                                    MaterialPageRoute<void>(
-                                        builder: (_) => _MembershipScreen(
-                                            plan: benefits[index - 1],
-                                            service: service,
-                                            onOpenGame: _openGame))));
+                            return Padding(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 4),
+                                child: _BenefitsCard(
+                                    plan: benefits[index],
+                                    onOpen: () => Navigator.push(
+                                        context,
+                                        MaterialPageRoute<void>(
+                                            builder: (_) => _MembershipScreen(
+                                                plan: benefits[index],
+                                                service: service,
+                                                onOpenGame: _openGame)))));
                           }
-                          final item = items[index - 1];
+                          final item = items[index];
                           return _SubscriptionCard(
                               key: ValueKey(item.id),
                               item: item,
                               onOpen: () => _openGame(item),
                               stale: service.errors.containsKey(item.platform),
                               now: service.now);
-                        },
-                      ))),
-            ]),
+                        }),
+                    const SliverToBoxAdapter(child: SizedBox(height: 24)),
+                  ],
+                )),
           );
         },
       );
@@ -261,76 +264,71 @@ class _SubscriptionCard extends StatelessWidget {
   final bool stale;
   @override
   Widget build(BuildContext context) {
-    final cover = item.coverUrl;
     final included = item.availableAt(now);
-    return Card(
-        shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-            side: BorderSide(color: AppTheme.platformColor(item.platform))),
-        child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              SizedBox(
-                  width: 65,
-                  height: 90,
-                  child: cover.isEmpty
-                      ? const Icon(Icons.sports_esports)
-                      : Image.network(cover,
-                          fit: BoxFit.cover,
-                          cacheWidth: 195,
-                          errorBuilder: (_, __, ___) =>
-                              const Icon(Icons.sports_esports))),
-              const SizedBox(width: 12),
-              Expanded(
-                  child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                    Text(item.title,
-                        style: const TextStyle(fontWeight: FontWeight.bold)),
-                    Text(
-                        item.status == SubscriptionStatus.leavingSoon &&
-                                !item.availabilityConfirmed
-                            ? 'Salida anunciada · Nivel por confirmar'
-                            : item.tier.displayName,
-                        style: const TextStyle(
-                            fontSize: 12, color: AppTheme.primaryLight)),
-                    Text(item.consoles.join(' / '),
-                        style: const TextStyle(fontSize: 11)),
-                    Text(
-                        stale
-                            ? 'Última consulta guardada · Pendiente de verificar'
-                            : item.status == SubscriptionStatus.leavingSoon
-                                ? 'Sale próximamente del catálogo'
-                                : included
-                                    ? 'Disponible ahora'
-                                    : item.addedAt?.isAfter(now) == true
-                                        ? 'Anunciado; aún no disponible'
-                                        : 'Alta del mes; verifica el acceso actual',
-                        style: TextStyle(
-                            fontSize: 12,
-                            color: item.status == SubscriptionStatus.leavingSoon
-                                ? AppTheme.warning
-                                : included
-                                    ? AppTheme.success
-                                    : AppTheme.warning)),
-                    if (item.addedAt != null)
-                      Text(
-                          'Alta: ${DateFormatter.formatShortDate(item.addedAt!)}',
-                          style: const TextStyle(fontSize: 11)),
-                    if (item.expiryDate != null)
-                      Text(
-                          '${item.status == SubscriptionStatus.leavingSoon ? 'Último día anunciado' : 'Reclamar hasta'}: ${item.expiryDate}',
-                          style: const TextStyle(fontSize: 11)),
-                    if (item.statusNote != null)
-                      Text(item.statusNote!,
-                          style: const TextStyle(
-                              fontSize: 11, color: AppTheme.textSecondary)),
-                    TextButton.icon(
-                        onPressed: onOpen,
-                        icon: const Icon(Icons.info_outline, size: 14),
-                        label: const Text('Ver detalles')),
-                  ])),
-            ])));
+    final accent = AppTheme.platformColor(item.platform);
+    return GameCardFrame(
+        platform: item.platform,
+        coverUrl: item.coverUrl,
+        onTap: onOpen,
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Wrap(spacing: 4, runSpacing: 4, children: [
+            PlatformBadge(platform: item.platform, compact: true),
+            const UsaBadge(compact: true),
+          ]),
+          const SizedBox(height: 8),
+          Text(item.title,
+              style: const TextStyle(
+                  fontSize: 15, fontWeight: FontWeight.w800, height: 1.2)),
+          const SizedBox(height: 4),
+          Text(item.consoles.join(' / '),
+              style:
+                  const TextStyle(fontSize: 11, color: AppTheme.textSecondary)),
+          const SizedBox(height: 5),
+          Text(
+              item.status == SubscriptionStatus.leavingSoon &&
+                      !item.availabilityConfirmed
+                  ? 'Salida anunciada · Nivel por confirmar'
+                  : item.tier.displayName,
+              style: TextStyle(
+                  fontSize: 11,
+                  color: Color.lerp(accent, Colors.white, .5),
+                  fontWeight: FontWeight.w700)),
+          const SizedBox(height: 5),
+          Text(
+              stale
+                  ? 'Última consulta guardada · Pendiente de verificar'
+                  : item.status == SubscriptionStatus.leavingSoon
+                      ? 'Sale próximamente del catálogo'
+                      : included
+                          ? 'Disponible ahora'
+                          : item.addedAt?.isAfter(now) == true
+                              ? 'Anunciado; aún no disponible'
+                              : 'Alta del mes; verifica el acceso actual',
+              style: TextStyle(
+                  fontSize: 11,
+                  color: item.status == SubscriptionStatus.leavingSoon
+                      ? AppTheme.warning
+                      : included
+                          ? AppTheme.success
+                          : AppTheme.warning)),
+          if (item.addedAt != null)
+            Text('Alta: ${DateFormatter.formatShortDate(item.addedAt!)}',
+                style: const TextStyle(fontSize: 10)),
+          if (item.expiryDate != null)
+            Text(
+                '${item.status == SubscriptionStatus.leavingSoon ? 'Último día anunciado' : 'Reclamar hasta'}: ${item.expiryDate}',
+                style: const TextStyle(fontSize: 10)),
+          if (item.statusNote != null)
+            Text(item.statusNote!,
+                style: const TextStyle(
+                    fontSize: 10, color: AppTheme.textSecondary)),
+          Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                  onPressed: onOpen,
+                  icon: const Icon(Icons.chevron_right_rounded, size: 18),
+                  label: const Text('Ver detalles'))),
+        ]));
   }
 }
 
@@ -407,9 +405,10 @@ class _MembershipScreenState extends State<_MembershipScreen> {
                 i.title.toLowerCase().contains(_query.toLowerCase()))
             .toList();
         return Scaffold(
-            appBar: AppBar(
-                title: Text(tier.displayName),
-                backgroundColor: AppTheme.platformColor(tier.platform)),
+            appBar: GamingHeader.adaptive(context,
+                title: tier.displayName,
+                subtitle: 'Beneficios, DLC y juegos incluidos · USA',
+                accent: AppTheme.platformColor(tier.platform)),
             body: Column(children: [
               Padding(
                   padding: const EdgeInsets.all(12),

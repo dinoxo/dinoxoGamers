@@ -278,7 +278,17 @@ class _GameDetailsScreenState extends State<GameDetailsScreen> {
             // Header: Box Art & Core Metadata
             Container(
               padding: const EdgeInsets.all(16),
-              color: AppTheme.surface,
+              margin: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                    color:
+                        AppTheme.platformColor(_game.platform).withAlpha(160)),
+                gradient: LinearGradient(colors: [
+                  AppTheme.platformColor(_game.platform).withAlpha(40),
+                  AppTheme.surface
+                ], begin: Alignment.topLeft, end: Alignment.bottomRight),
+              ),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [

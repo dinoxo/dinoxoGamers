@@ -40,7 +40,7 @@ class _MultiSource extends PreorderSource {
   Future<List<String>> autocomplete(String query) async => [];
   @override
   Future<PreorderPage> search(String query, {int page = 1}) async =>
-      PreorderPage([]);
+      const PreorderPage([]);
 }
 
 void main() {
@@ -94,7 +94,8 @@ void main() {
     expect(alerts, 1);
   });
 
-  testWidgets('PreordersScreen filters by platform and prioritizes GTA and Zelda',
+  testWidgets(
+      'PreordersScreen filters by platform and prioritizes GTA and Zelda',
       (tester) async {
     final now = DateTime.now();
     final release = DateTime(now.year, now.month, now.day + 30);

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../core/widgets/gaming_header.dart';
+import '../../core/widgets/game_card_frame.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/repositories/game_repository.dart';
@@ -162,142 +164,91 @@ class _LibraryScreenState extends State<LibraryScreen>
     );
   }
 
+  Widget _gameCard(Game game, {required bool owned}) => GameCardFrame(
+        platform: game.platform,
+        coverUrl: game.coverUrl,
+        margin: const EdgeInsets.only(bottom: 10),
+        onTap: owned
+            ? () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (_) => GameDetailsScreen(
+                        game: game, repository: widget.repository)))
+            : () => _showEditionComparator(game),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          PlatformBadge(platform: game.platform, compact: true),
+          const SizedBox(height: 8),
+          Text(game.title,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style:
+                  const TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
+          const SizedBox(height: 4),
+          Text(game.consoles.join(' / '),
+              style:
+                  const TextStyle(fontSize: 11, color: AppTheme.textSecondary)),
+          const SizedBox(height: 8),
+          if (owned)
+            const Text('En tu colección',
+                style: TextStyle(color: AppTheme.success, fontSize: 11))
+          else
+            Text(
+                '${game.editions.length} ${game.editions.length == 1 ? 'edición' : 'ediciones disponibles'}',
+                style: const TextStyle(
+                    color: AppTheme.textSecondary, fontSize: 11)),
+          Align(
+              alignment: Alignment.centerRight,
+              child: owned
+                  ? IconButton(
+                      icon: const Icon(Icons.delete_outline,
+                          color: AppTheme.textMuted),
+                      tooltip: 'Quitar de biblioteca',
+                      onPressed: () async {
+                        await widget.repository.toggleGameOwned(game);
+                        _loadData();
+                      })
+                  : TextButton.icon(
+                      onPressed: () => _showEditionComparator(game),
+                      icon: const Icon(Icons.compare_arrows_rounded, size: 18),
+                      label: const Text('Comparar'))),
+        ]),
+      );
+
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Biblioteca y Herramientas'),
-        bottom: TabBar(
-          controller: _tabController,
-          indicatorColor: AppTheme.primaryLight,
-          labelColor: AppTheme.textPrimary,
-          unselectedLabelColor: AppTheme.textMuted,
-          tabs: const [
-            Tab(text: 'Mis Juegos Comprados'),
-            Tab(text: 'Comparador de Ediciones'),
-          ],
-        ),
-      ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : TabBarView(
-              controller: _tabController,
-              children: [
-                // Tab 1: Owned Games
+  Widget build(BuildContext context) => Scaffold(
+        appBar: GamingHeader.adaptive(context,
+            title: 'Biblioteca y Herramientas',
+            subtitle: 'Tu colección y las ediciones de cada juego.',
+            bottom: TabBar(
+                controller: _tabController,
+                indicatorColor: AppTheme.secondary,
+                labelColor: AppTheme.textPrimary,
+                unselectedLabelColor: AppTheme.textMuted,
+                labelStyle:
+                    const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
+                tabs: const [
+                  Tab(text: 'Mis Juegos Comprados'),
+                  Tab(text: 'Comparador de Ediciones')
+                ])),
+        body: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : TabBarView(controller: _tabController, children: [
                 _ownedGames.isEmpty
                     ? const EmptyStateView(
                         icon: Icons.inventory_2_outlined,
                         title: 'Tu biblioteca está vacía',
                         message:
-                            'Puedes marcar los juegos que ya compraste tocando el icono de inventario en su ficha para evitar compras duplicadas.',
-                      )
+                            'Puedes marcar los juegos que ya compraste tocando el icono de inventario en su ficha para evitar compras duplicadas.')
                     : ListView.builder(
                         itemCount: _ownedGames.length,
-                        padding: const EdgeInsets.all(12),
-                        itemBuilder: (context, index) {
-                          final game = _ownedGames[index];
-                          return Card(
-                            margin: const EdgeInsets.only(bottom: 10),
-                            child: ListTile(
-                              leading: ClipRRect(
-                                borderRadius: BorderRadius.circular(8),
-                                child: Image.network(
-                                  game.coverUrl,
-                                  width: 45,
-                                  height: 60,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (_, __, ___) =>
-                                      const Icon(Icons.sports_esports),
-                                ),
-                              ),
-                              title: Text(
-                                game.title,
-                                style: const TextStyle(
-                                    color: AppTheme.textPrimary,
-                                    fontWeight: FontWeight.w700),
-                              ),
-                              subtitle: Row(
-                                children: [
-                                  PlatformBadge(
-                                      platform: game.platform, compact: true),
-                                  const SizedBox(width: 6),
-                                  const Text('En tu colección',
-                                      style: TextStyle(
-                                          color: AppTheme.success,
-                                          fontSize: 11)),
-                                ],
-                              ),
-                              trailing: IconButton(
-                                icon: const Icon(Icons.delete_outline,
-                                    color: AppTheme.textMuted),
-                                tooltip: 'Quitar de biblioteca',
-                                onPressed: () async {
-                                  await widget.repository.toggleGameOwned(game);
-                                  _loadData();
-                                },
-                              ),
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => GameDetailsScreen(
-                                      game: game,
-                                      repository: widget.repository,
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-                          );
-                        },
-                      ),
-
-                // Tab 2: Edition Comparator
+                        padding: const EdgeInsets.all(14),
+                        itemBuilder: (context, index) =>
+                            _gameCard(_ownedGames[index], owned: true)),
                 ListView.builder(
-                  itemCount: _allGames.length,
-                  padding: const EdgeInsets.all(12),
-                  itemBuilder: (context, index) {
-                    final game = _allGames[index];
-                    return Card(
-                      margin: const EdgeInsets.only(bottom: 10),
-                      child: ListTile(
-                        leading: ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: Image.network(
-                            game.coverUrl,
-                            width: 45,
-                            height: 60,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) =>
-                                const Icon(Icons.sports_esports),
-                          ),
-                        ),
-                        title: Text(
-                          game.title,
-                          style: const TextStyle(
-                              color: AppTheme.textPrimary,
-                              fontWeight: FontWeight.w700),
-                        ),
-                        subtitle: Text(
-                          '${game.editions.length} ${game.editions.length == 1 ? 'edición' : 'ediciones disponibles'}',
-                          style: const TextStyle(
-                              color: AppTheme.textSecondary, fontSize: 12),
-                        ),
-                        trailing: OutlinedButton(
-                          onPressed: () => _showEditionComparator(game),
-                          style: OutlinedButton.styleFrom(
-                            minimumSize: const Size(80, 34),
-                            padding: const EdgeInsets.symmetric(horizontal: 10),
-                          ),
-                          child: const Text('Comparar',
-                              style: TextStyle(fontSize: 12)),
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ],
-            ),
-    );
-  }
+                    itemCount: _allGames.length,
+                    padding: const EdgeInsets.all(14),
+                    itemBuilder: (context, index) =>
+                        _gameCard(_allGames[index], owned: false)),
+              ]),
+      );
 }

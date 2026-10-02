@@ -3,6 +3,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/date_formatter.dart';
 import '../../../domain/models/game.dart';
 import '../../../domain/services/subscription_service.dart';
+import 'game_card_frame.dart';
 import 'platform_badge.dart';
 import 'price_tag.dart';
 import 'usa_badge.dart';
@@ -12,221 +13,105 @@ class DealCard extends StatelessWidget {
   final bool isFavorite;
   final VoidCallback onTap;
   final VoidCallback onToggleFavorite;
-
-  const DealCard({
-    super.key,
-    required this.game,
-    this.isFavorite = false,
-    required this.onTap,
-    required this.onToggleFavorite,
-  });
+  const DealCard(
+      {super.key,
+      required this.game,
+      this.isFavorite = false,
+      required this.onTap,
+      required this.onToggleFavorite});
 
   @override
   Widget build(BuildContext context) {
     final edition = game.primaryEdition;
     final promoEnd = edition?.promoEndDate;
-
-    return Card(
-      color: Color.alphaBlend(
-          AppTheme.platformColor(game.platform).withAlpha(25),
-          AppTheme.surface),
-      shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
-          side: BorderSide(
-              color: AppTheme.platformColor(game.platform), width: 1.5)),
-      margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Cover Image
-              ClipRRect(
-                borderRadius: BorderRadius.circular(10),
-                child: Container(
-                  width: 95,
-                  height: 125,
-                  color: AppTheme.surfaceElevated,
-                  child: Image.network(
-                    game.coverUrl,
-                    cacheWidth: 285,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Container(
-                        color: AppTheme.surfaceElevated,
-                        child: const Center(
-                          child: Icon(Icons.sports_esports,
-                              color: AppTheme.textMuted, size: 36),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-
-              // Game Info
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Top Platform & USA Badges
-                    Row(
-                      children: [
-                        PlatformBadge(platform: game.platform, compact: true),
-                        const SizedBox(width: 6),
-                        const UsaBadge(compact: true),
-                        const Spacer(),
-                        IconButton(
-                          icon: Icon(
-                            isFavorite ? Icons.favorite : Icons.favorite_border,
-                            color: isFavorite
-                                ? AppTheme.danger
-                                : AppTheme.textMuted,
-                            size: 20,
-                          ),
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(),
-                          onPressed: onToggleFavorite,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-
-                    // Game Title
-                    Text(
-                      game.title,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: AppTheme.textPrimary,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                        height: 1.2,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-
-                    // Edition & Consoles
-                    Text(
-                      game.consoles.join(' / '),
-                      style: const TextStyle(
-                        color: AppTheme.textSecondary,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-
-                    // Subscription recommendation / status
-                    ListenableBuilder(
-                        listenable: SubscriptionService.instance,
-                        builder: (context, _) {
-                          final subMatch = SubscriptionService.instance
-                              .checkGame(game.title,
-                                  platform: game.platform,
-                                  consoles: game.consoles);
-                          if (subMatch == null) return const SizedBox.shrink();
-
-                          Color chipColor;
-                          IconData chipIcon;
-                          String chipText;
-
-                          if (subMatch.isLeavingSoon) {
-                            chipColor = AppTheme.warning;
-                            chipIcon = Icons.hourglass_bottom_rounded;
-                            chipText =
-                                'Sale pronto de ${subMatch.item.shortBadgeLabel}';
-                          } else if (subMatch.isComingSoon) {
-                            chipColor = const Color(0xFF00C3FF);
-                            chipIcon = Icons.upcoming_rounded;
-                            chipText =
-                                'Pronto en ${subMatch.item.shortBadgeLabel}';
-                          } else {
-                            chipColor = AppTheme.success;
-                            chipIcon = Icons.card_membership_rounded;
-                            chipText =
-                                'En ${subMatch.item.shortBadgeLabel} · Revisa tu membresía';
-                          }
-
-                          return Container(
-                            margin: const EdgeInsets.only(bottom: 6),
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 6, vertical: 3),
-                            decoration: BoxDecoration(
-                              color: chipColor.withAlpha(25),
-                              borderRadius: BorderRadius.circular(6),
-                              border: Border.all(
-                                  color: chipColor.withAlpha(100), width: 0.9),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(chipIcon, size: 12, color: chipColor),
-                                const SizedBox(width: 4),
-                                Flexible(
-                                  child: Text(
-                                    chipText,
-                                    style: TextStyle(
-                                      color: chipColor,
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                        }),
-
-                    // Promo Ending notice
-                    if (promoEnd != null) ...[
-                      Row(
-                        children: [
-                          const Icon(Icons.schedule,
-                              size: 12, color: AppTheme.warning),
-                          const SizedBox(width: 4),
-                          Text(
-                            DateFormatter.formatPromoEndDate(promoEnd),
-                            style: const TextStyle(
-                              color: AppTheme.warning,
-                              fontSize: 10,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-                    ],
-
-                    // Price Tag
-                    if (edition == null)
-                      const Text('Sin precio USA disponible',
-                          style: TextStyle(color: AppTheme.textMuted)),
-                    if (edition != null)
-                      PriceTag(
-                        currentPrice: edition.currentPrice,
-                        regularPrice: edition.regularPrice,
-                        discountPercent: edition.discountPercent,
-                        isLowestHistorical: edition.isLowestHistorical,
-                      ),
-                    if (edition != null)
-                      Text(
-                          'Consultado ${DateFormatter.formatRelativeTime(edition.lastChecked)} · Deku Deals',
-                          style: const TextStyle(
-                              color: AppTheme.textMuted, fontSize: 10)),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+    return GameCardFrame(
+      platform: game.platform,
+      coverUrl: game.coverUrl,
+      onTap: onTap,
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Expanded(
+              child: Wrap(spacing: 4, runSpacing: 4, children: [
+            PlatformBadge(platform: game.platform, compact: true),
+            const UsaBadge(compact: true),
+          ])),
+          IconButton(
+              onPressed: onToggleFavorite,
+              tooltip:
+                  isFavorite ? 'Quitar de favoritos' : 'Añadir a favoritos',
+              visualDensity: VisualDensity.compact,
+              padding: EdgeInsets.zero,
+              icon: Icon(
+                  isFavorite
+                      ? Icons.favorite_rounded
+                      : Icons.favorite_border_rounded,
+                  size: 20,
+                  color:
+                      isFavorite ? AppTheme.danger : AppTheme.textSecondary)),
+        ]),
+        const SizedBox(height: 4),
+        Text(game.title,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+                fontSize: 15, fontWeight: FontWeight.w800, height: 1.15)),
+        const SizedBox(height: 3),
+        Text(game.consoles.join(' / '),
+            style:
+                const TextStyle(fontSize: 11, color: AppTheme.textSecondary)),
+        const SizedBox(height: 6),
+        ListenableBuilder(
+            listenable: SubscriptionService.instance,
+            builder: (context, _) {
+              final match = SubscriptionService.instance.checkGame(game.title,
+                  platform: game.platform, consoles: game.consoles);
+              if (match == null) return const SizedBox.shrink();
+              final color = match.isLeavingSoon
+                  ? AppTheme.warning
+                  : match.isComingSoon
+                      ? AppTheme.secondary
+                      : AppTheme.success;
+              final text = match.isLeavingSoon
+                  ? 'Sale pronto de ${match.item.shortBadgeLabel}'
+                  : match.isComingSoon
+                      ? 'Pronto en ${match.item.shortBadgeLabel}'
+                      : 'En ${match.item.shortBadgeLabel} · Revisa tu membresía';
+              return Padding(
+                  padding: const EdgeInsets.only(bottom: 5),
+                  child: Text(text,
+                      style: TextStyle(
+                          color: color,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700)));
+            }),
+        if (promoEnd != null)
+          Padding(
+              padding: const EdgeInsets.only(bottom: 5),
+              child: Text(DateFormatter.formatPromoEndDate(promoEnd),
+                  style:
+                      const TextStyle(color: AppTheme.warning, fontSize: 10))),
+        Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+          Expanded(
+              child: edition == null
+                  ? const Text('Sin precio USA disponible',
+                      style: TextStyle(color: AppTheme.textMuted, fontSize: 12))
+                  : PriceTag(
+                      currentPrice: edition.currentPrice,
+                      regularPrice: edition.regularPrice,
+                      discountPercent: edition.discountPercent,
+                      isLowestHistorical: edition.isLowestHistorical,
+                      compact: true)),
+          const SizedBox(width: 4),
+          GameCardArrow(platform: game.platform, onTap: onTap),
+        ]),
+        if (edition != null)
+          Padding(
+              padding: const EdgeInsets.only(top: 5),
+              child: Text(
+                  'Consultado ${DateFormatter.formatRelativeTime(edition.lastChecked)} · Deku Deals',
+                  style:
+                      const TextStyle(color: AppTheme.textMuted, fontSize: 9))),
+      ]),
     );
   }
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'package:dinoxo_gamers/core/constants/app_constants.dart';
 import 'package:dinoxo_gamers/core/theme/app_theme.dart';
 import 'package:dinoxo_gamers/domain/models/game.dart';
@@ -7,7 +8,64 @@ import 'package:dinoxo_gamers/domain/models/game_edition.dart';
 import 'package:dinoxo_gamers/ui/core/widgets/deal_card.dart';
 
 void main() {
-  testWidgets('DealCard renders title, USA badge, platform and prices', (WidgetTester tester) async {
+  setUpAll(() => initializeDateFormatting('es'));
+  testWidgets('game cards remain usable on narrow screens with larger text',
+      (tester) async {
+    tester.view.physicalSize = const Size(320, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    var opened = false;
+    var favorited = false;
+    await tester.pumpWidget(MaterialApp(
+        theme: AppTheme.darkTheme,
+        home: MediaQuery(
+            data: const MediaQueryData(
+                size: Size(320, 800), textScaler: TextScaler.linear(1.4)),
+            child: Scaffold(
+                body: ListView(children: [
+              DealCard(
+                game: Game(
+                    id: 'long',
+                    title: 'Ghost of Tsushima DIRECTOR’S CUT Deluxe Edition',
+                    slug: 'long',
+                    coverUrl: '',
+                    platform: GamePlatform.playstation,
+                    consoles: const ['PS5', 'PS4'],
+                    genres: const [],
+                    developer: '',
+                    publisher: '',
+                    releaseDate: null,
+                    editions: [
+                      GameEdition(
+                          id: 'edition',
+                          gameId: 'long',
+                          name: 'Deluxe',
+                          currentPrice: 119.99,
+                          regularPrice: 149.99,
+                          discountPercent: 20,
+                          lowestObservedPrice: 119.99,
+                          lowestObservedDate: DateTime(2026),
+                          sourceUrl: '',
+                          officialStoreUrl: '',
+                          lastChecked: DateTime(2026))
+                    ]),
+                onTap: () => opened = true,
+                onToggleFavorite: () => favorited = true,
+              )
+            ])))));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expect(find.text('\$119.99'), findsOneWidget);
+    await tester.tap(find.byTooltip('Añadir a favoritos'));
+    expect(favorited, isTrue);
+    expect(opened, isFalse);
+    await tester
+        .tap(find.text('Ghost of Tsushima DIRECTOR’S CUT Deluxe Edition'));
+    expect(opened, isTrue);
+  });
+  testWidgets('DealCard renders title, USA badge, platform and prices',
+      (WidgetTester tester) async {
     final now = DateTime.now();
     final testGame = Game(
       id: 'test_game_1',

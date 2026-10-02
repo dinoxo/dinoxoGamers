@@ -26,15 +26,18 @@ class UsaBadge extends StatelessWidget {
         children: [
           const Icon(Icons.public, size: 12, color: AppTheme.secondary),
           const SizedBox(width: 4),
-          Text(
+          Flexible(
+              child: Text(
             'USA · USD',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: TextStyle(
               color: AppTheme.textPrimary,
               fontSize: compact ? 10 : 11,
               fontWeight: FontWeight.w800,
               letterSpacing: 0.5,
             ),
-          ),
+          )),
         ],
       ),
     );

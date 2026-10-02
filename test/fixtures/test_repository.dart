@@ -8,6 +8,10 @@ import 'package:dinoxo_gamers/domain/models/release_alert.dart';
 
 class TestRepository extends GameRepository {
   @override
+  Future<List<Game>> getOwnedGames() async => [];
+  @override
+  Future<List<Game>> getGames({GameFilterOptions? filters}) async => [];
+  @override
   Future<LiveCatalogPage> refreshLiveDeals(
           {GamePlatform? platform, int page = 1}) async =>
       const LiveCatalogPage([]);

@@ -133,13 +133,13 @@ void main() {
   testWidgets(
       'missing snapshot shows neutral cover and explains unavailable game',
       (tester) async {
+    final semantics = tester.ensureSemantics();
     await _showAlerts(tester, _AlertRepository(_alert(), null));
-    expect(
-        find.byWidgetPredicate((widget) =>
-            widget is Icon &&
-            widget.icon == Icons.sports_esports &&
-            widget.size == null),
-        findsOneWidget);
+    try {
+      expect(find.bySemanticsLabel('Portada no disponible'), findsOneWidget);
+    } finally {
+      semantics.dispose();
+    }
     await tester.tap(find.text('Saved Game'));
     await tester.pumpAndSettle();
     expect(find.byType(GameDetailsScreen), findsNothing);

@@ -8,93 +8,65 @@ class PriceTag extends StatelessWidget {
   final int discountPercent;
   final bool isLowestHistorical;
   final bool showAtlBadge;
-
-  const PriceTag({
-    super.key,
-    required this.currentPrice,
-    required this.regularPrice,
-    required this.discountPercent,
-    this.isLowestHistorical = false,
-    this.showAtlBadge = true,
-  });
-
+  final bool compact;
+  const PriceTag(
+      {super.key,
+      required this.currentPrice,
+      required this.regularPrice,
+      required this.discountPercent,
+      this.isLowestHistorical = false,
+      this.showAtlBadge = true,
+      this.compact = false});
   @override
   Widget build(BuildContext context) {
     final hasDiscount = discountPercent > 0 && currentPrice < regularPrice;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        if (showAtlBadge && isLowestHistorical)
-          Container(
-            margin: const EdgeInsets.only(bottom: 4),
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-            decoration: BoxDecoration(
-              color: AppTheme.hotDeal.withAlpha(40),
-              borderRadius: BorderRadius.circular(4),
-              border: Border.all(color: AppTheme.hotDeal, width: 0.8),
-            ),
-            child: const Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.local_fire_department, size: 12, color: AppTheme.hotDeal),
-                SizedBox(width: 2),
-                Text(
-                  'MÍNIMO HISTÓRICO',
-                  style: TextStyle(
-                    color: AppTheme.hotDeal,
-                    fontSize: 9,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 0.3,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.baseline,
-          textBaseline: TextBaseline.alphabetic,
-          children: [
-            Text(
-              CurrencyFormatter.formatUsd(currentPrice),
-              style: const TextStyle(
-                color: AppTheme.textPrimary,
-                fontSize: 18,
-                fontWeight: FontWeight.w900,
-                letterSpacing: -0.3,
-              ),
-            ),
-            if (hasDiscount) ...[
-              const SizedBox(width: 8),
-              Text(
-                CurrencyFormatter.formatUsd(regularPrice),
-                style: const TextStyle(
-                  color: AppTheme.textMuted,
-                  fontSize: 12,
-                  decoration: TextDecoration.lineThrough,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Container(
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      if (hasDiscount || (showAtlBadge && isLowestHistorical)) ...[
+        Wrap(spacing: 4, runSpacing: 4, children: [
+          if (hasDiscount)
+            Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
-                  color: AppTheme.success,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Text(
-                  CurrencyFormatter.formatDiscount(discountPercent),
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ),
-            ],
-          ],
-        ),
+                    gradient: const LinearGradient(
+                        colors: [AppTheme.primary, Color(0xFF5145FF)]),
+                    borderRadius: BorderRadius.circular(6)),
+                child: Text(CurrencyFormatter.formatDiscount(discountPercent),
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800))),
+          if (showAtlBadge && isLowestHistorical)
+            Container(
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                decoration: BoxDecoration(
+                    color: AppTheme.hotDeal.withAlpha(25),
+                    borderRadius: BorderRadius.circular(6)),
+                child: const Text('MÍNIMO HISTÓRICO',
+                    style: TextStyle(
+                        color: AppTheme.hotDeal,
+                        fontSize: 9,
+                        fontWeight: FontWeight.w800))),
+        ]),
+        const SizedBox(height: 4),
       ],
-    );
+      Wrap(
+          spacing: 6,
+          runSpacing: 2,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            Text(CurrencyFormatter.formatUsd(currentPrice),
+                style: TextStyle(
+                    color: AppTheme.textPrimary,
+                    fontSize: compact ? 20 : 24,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: -.6)),
+            if (hasDiscount)
+              Text(CurrencyFormatter.formatUsd(regularPrice),
+                  style: const TextStyle(
+                      color: AppTheme.textSecondary,
+                      fontSize: 11,
+                      decoration: TextDecoration.lineThrough)),
+          ]),
+    ]);
   }
 }

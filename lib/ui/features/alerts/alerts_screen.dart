@@ -10,6 +10,9 @@ import '../../../domain/models/game.dart';
 import '../../../domain/services/notification_service.dart';
 import '../../core/widgets/empty_state_view.dart';
 import '../../core/widgets/platform_badge.dart';
+import '../../core/widgets/usa_badge.dart';
+import '../../core/widgets/gaming_header.dart';
+import '../../core/widgets/game_card_frame.dart';
 import '../game_details/game_details_screen.dart';
 
 class AlertsScreen extends StatefulWidget {
@@ -159,37 +162,43 @@ class _AlertsScreenState extends State<AlertsScreen> {
 
   Widget _releaseCard(ReleaseAlert alert) {
     final days = alert.daysRemaining(DateTime.now());
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-      shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-          side: BorderSide(color: AppTheme.platformColor(alert.platform))),
-      child: ListTile(
+    return GameCardFrame(
+        platform: alert.platform,
+        coverUrl: alert.coverUrl,
         onTap: () => _openReleaseGame(alert),
-        leading: SizedBox(
-            width: 52,
-            height: 72,
-            child: alert.coverUrl.isEmpty
-                ? const Icon(Icons.sports_esports)
-                : Image.network(alert.coverUrl,
-                    fit: BoxFit.cover,
-                    cacheWidth: 156,
-                    errorBuilder: (_, __, ___) =>
-                        const Icon(Icons.sports_esports))),
-        title: Text(alert.gameTitle),
-        subtitle: Text('Aviso de lanzamiento · '
-            '${days > 0 ? 'Faltan $days días' : days == 0 ? 'Sale hoy' : 'Fecha anunciada transcurrida'}\n'
-            '${DateFormatter.formatShortDate(alert.releaseDate)} · ${alert.platform.name}'),
-        trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-          Switch(
-              value: alert.isActive, onChanged: (_) => _toggleRelease(alert)),
-          IconButton(
-              tooltip: 'Eliminar aviso de lanzamiento',
-              onPressed: () => _deleteRelease(alert),
-              icon: const Icon(Icons.delete_outline)),
-        ]),
-      ),
-    );
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Wrap(spacing: 4, runSpacing: 4, children: [
+            PlatformBadge(platform: alert.platform, compact: true),
+            const UsaBadge(compact: true)
+          ]),
+          const SizedBox(height: 8),
+          Text(alert.gameTitle,
+              style:
+                  const TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
+          const SizedBox(height: 6),
+          Text(
+              'Aviso de lanzamiento · ${days > 0 ? 'Faltan $days días' : days == 0 ? 'Sale hoy' : 'Fecha anunciada transcurrida'}',
+              style: const TextStyle(
+                  color: AppTheme.secondary,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700)),
+          Text(DateFormatter.formatShortDate(alert.releaseDate),
+              style:
+                  const TextStyle(fontSize: 11, color: AppTheme.textSecondary)),
+          Wrap(crossAxisAlignment: WrapCrossAlignment.center, children: [
+            Switch(
+                value: alert.isActive,
+                activeThumbColor: AppTheme.platformColor(alert.platform),
+                onChanged: (_) => _toggleRelease(alert)),
+            IconButton(
+                tooltip: 'Eliminar aviso de lanzamiento',
+                onPressed: () => _deleteRelease(alert),
+                icon: const Icon(Icons.delete_outline,
+                    color: AppTheme.textMuted)),
+            GameCardArrow(
+                platform: alert.platform, onTap: () => _openReleaseGame(alert)),
+          ]),
+        ]));
   }
 
   void _openGame(UserAlert alert) {
@@ -267,265 +276,122 @@ class _AlertsScreenState extends State<AlertsScreen> {
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Mis Alertas'),
-        actions: [
-          IconButton(
-              tooltip: 'Consultar precios ahora',
-              onPressed: _checking ? null : _checkPrices,
-              icon: const Icon(Icons.refresh)),
-          IconButton(
-            icon: const Icon(Icons.notifications_none),
-            tooltip: 'Configurar permisos de notificación',
-            onPressed: _testNotificationPermission,
-          ),
-        ],
-      ),
-      body: Column(
-        children: [
-          // Push Server & Quiet Hours Information Box
-          Container(
-            padding: const EdgeInsets.all(12),
-            margin: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: AppTheme.surfaceElevated,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: AppTheme.border),
-            ),
-            child: const Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(Icons.shield_outlined,
-                    size: 18, color: AppTheme.secondary),
-                SizedBox(width: 8),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Avisos de precios y lanzamientos',
-                        style: TextStyle(
-                          color: AppTheme.textPrimary,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      SizedBox(height: 3),
-                      Text(
-                        'Android consulta los precios en segundo plano con conexión; el sistema puede retrasar la revisión. Los lanzamientos se programan para un día antes y la fecha anunciada. Activa el permiso de notificaciones.',
-                        style: TextStyle(
-                            color: AppTheme.textSecondary,
-                            fontSize: 11,
-                            height: 1.3),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
+  Widget _priceCard(UserAlert alert) => GameCardFrame(
+        platform: alert.platform,
+        coverUrl: _games[alert.gameId]?.coverUrl ?? '',
+        onTap: () => _openGame(alert),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Wrap(spacing: 4, runSpacing: 4, children: [
+            PlatformBadge(platform: alert.platform, compact: true),
+            const UsaBadge(compact: true)
+          ]),
+          const SizedBox(height: 8),
+          Text(alert.gameTitle,
+              style:
+                  const TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
+          Text('Edición: ${alert.editionName}',
+              style:
+                  const TextStyle(color: AppTheme.textSecondary, fontSize: 11)),
+          const SizedBox(height: 8),
+          const Text('Objetivo: ',
+              style: TextStyle(color: AppTheme.textMuted, fontSize: 10)),
+          Text('<= ${CurrencyFormatter.formatUsd(alert.targetPrice)}',
+              style: const TextStyle(
+                  color: AppTheme.success,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w900)),
+          Text('Creada: ${DateFormatter.formatShortDate(alert.createdAt)}',
+              style: const TextStyle(color: AppTheme.textMuted, fontSize: 10)),
+          if (alert.alertOnAllTimeLow)
+            const Text('Mínimo histórico: pendiente de datos',
+                style: TextStyle(color: AppTheme.hotDeal, fontSize: 10)),
+          if (alert.alertOnPromoEnding)
+            const Text('Fin de oferta: pendiente de fecha exacta',
+                style: TextStyle(color: AppTheme.warning, fontSize: 10)),
+          Wrap(crossAxisAlignment: WrapCrossAlignment.center, children: [
+            Switch(
+                value: alert.isActive,
+                activeThumbColor: AppTheme.platformColor(alert.platform),
+                onChanged: (_) => _toggleAlert(alert)),
+            IconButton(
+                tooltip: 'Eliminar alerta',
+                onPressed: () => _deleteAlert(alert),
+                icon: const Icon(Icons.delete_outline,
+                    size: 20, color: AppTheme.textMuted)),
+            TextButton.icon(
+                onPressed: () => _openGame(alert),
+                icon: const Icon(Icons.chevron_right_rounded, size: 18),
+                label: const Text('Ver Juego', style: TextStyle(fontSize: 12))),
+          ]),
+        ]),
+      );
 
-          // Alerts List
-          Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : _alerts.isEmpty && _releaseAlerts.isEmpty
-                    ? const EmptyStateView(
-                        icon: Icons.notifications_off_outlined,
-                        title: 'No tienes alertas activas',
-                        message:
-                            'Crea una alerta de precio desde una ficha o un aviso de salida desde Preventas.',
-                      )
-                    : ListView.builder(
-                        itemCount: _releaseAlerts.length + _alerts.length,
-                        itemBuilder: (context, index) {
-                          if (index < _releaseAlerts.length) {
-                            return _releaseCard(_releaseAlerts[index]);
-                          }
-                          final alert = _alerts[index - _releaseAlerts.length];
-                          return Card(
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                side: BorderSide(
-                                    color: AppTheme.platformColor(
-                                        alert.platform))),
-                            margin: const EdgeInsets.symmetric(
-                                horizontal: 14, vertical: 6),
-                            child: InkWell(
-                                onTap: () => _openGame(alert),
-                                child: Padding(
-                                  padding: const EdgeInsets.all(12),
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Row(
-                                        children: [
-                                          SizedBox(
-                                              width: 52,
-                                              height: 72,
-                                              child: (_games[alert.gameId]
-                                                          ?.coverUrl
-                                                          .isNotEmpty ??
-                                                      false)
-                                                  ? Image.network(
-                                                      _games[alert.gameId]!
-                                                          .coverUrl,
-                                                      fit: BoxFit.cover,
-                                                      cacheWidth: 156,
-                                                      errorBuilder: (_, __,
-                                                              ___) =>
-                                                          const Icon(Icons
-                                                              .sports_esports))
-                                                  : const Icon(
-                                                      Icons.sports_esports)),
-                                          const SizedBox(width: 10),
-                                          PlatformBadge(
-                                              platform: alert.platform,
-                                              compact: true),
-                                          const SizedBox(width: 8),
-                                          Expanded(
-                                            child: Text(
-                                              alert.gameTitle,
-                                              style: const TextStyle(
-                                                color: AppTheme.textPrimary,
-                                                fontSize: 15,
-                                                fontWeight: FontWeight.w700,
-                                              ),
-                                            ),
-                                          ),
-                                          Switch(
-                                            value: alert.isActive,
-                                            activeThumbColor:
-                                                AppTheme.platformColor(
-                                                    alert.platform),
-                                            onChanged: (_) =>
-                                                _toggleAlert(alert),
-                                          ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 6),
-                                      Text(
-                                        'Edición: ${alert.editionName}',
-                                        style: const TextStyle(
-                                            color: AppTheme.textSecondary,
-                                            fontSize: 12),
-                                      ),
-                                      const SizedBox(height: 8),
-                                      Wrap(
-                                        spacing: 16,
-                                        runSpacing: 6,
-                                        children: [
-                                          Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              const Text(
-                                                'Objetivo: ',
-                                                style: TextStyle(
-                                                    color: AppTheme.textMuted,
-                                                    fontSize: 12),
-                                              ),
-                                              Text(
-                                                '<= ${CurrencyFormatter.formatUsd(alert.targetPrice)}',
-                                                style: const TextStyle(
-                                                  color: AppTheme.success,
-                                                  fontSize: 14,
-                                                  fontWeight: FontWeight.w800,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                          Text(
-                                            'Creada: ${DateFormatter.formatShortDate(alert.createdAt)}',
-                                            style: const TextStyle(
-                                                color: AppTheme.textMuted,
-                                                fontSize: 10),
-                                          ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 8),
-                                      Wrap(
-                                        spacing: 6,
-                                        children: [
-                                          if (alert.alertOnAllTimeLow)
-                                            Container(
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                      horizontal: 6,
-                                                      vertical: 2),
-                                              decoration: BoxDecoration(
-                                                color: AppTheme.hotDeal
-                                                    .withAlpha(25),
-                                                borderRadius:
-                                                    BorderRadius.circular(4),
-                                              ),
-                                              child: const Text(
-                                                'Mínimo histórico: pendiente de datos',
-                                                style: TextStyle(
-                                                    color: AppTheme.hotDeal,
-                                                    fontSize: 10,
-                                                    fontWeight:
-                                                        FontWeight.w700),
-                                              ),
-                                            ),
-                                          if (alert.alertOnPromoEnding)
-                                            Container(
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                      horizontal: 6,
-                                                      vertical: 2),
-                                              decoration: BoxDecoration(
-                                                color: AppTheme.warning
-                                                    .withAlpha(25),
-                                                borderRadius:
-                                                    BorderRadius.circular(4),
-                                              ),
-                                              child: const Text(
-                                                'Fin de oferta: pendiente de fecha exacta',
-                                                style: TextStyle(
-                                                    color: AppTheme.warning,
-                                                    fontSize: 10,
-                                                    fontWeight:
-                                                        FontWeight.w700),
-                                              ),
-                                            ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 8),
-                                      Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.end,
-                                        children: [
-                                          TextButton.icon(
-                                            onPressed: () => _openGame(alert),
-                                            icon: const Icon(
-                                                Icons.visibility_outlined,
-                                                size: 16),
-                                            label: const Text('Ver Juego',
-                                                style: TextStyle(fontSize: 12)),
-                                          ),
-                                          IconButton(
-                                            icon: const Icon(
-                                                Icons.delete_outline,
-                                                color: AppTheme.danger,
-                                                size: 20),
-                                            onPressed: () =>
-                                                _deleteAlert(alert),
-                                          ),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                )),
-                          );
-                        },
-                      ),
-          ),
-        ],
-      ),
-    );
-  }
+  @override
+  Widget build(BuildContext context) => Scaffold(
+        appBar: GamingHeader.adaptive(context,
+            title: 'Mis Alertas',
+            subtitle: 'Tus precios favoritos y próximos lanzamientos.',
+            actions: [
+              IconButton(
+                  tooltip: 'Consultar precios ahora',
+                  onPressed: _checking ? null : _checkPrices,
+                  icon: const Icon(Icons.refresh_rounded)),
+              IconButton(
+                  tooltip: 'Configurar permisos de notificación',
+                  onPressed: _testNotificationPermission,
+                  icon: const Icon(Icons.notifications_none)),
+            ]),
+        body: CustomScrollView(slivers: [
+          SliverToBoxAdapter(
+              child: Container(
+                  padding: const EdgeInsets.all(12),
+                  margin: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                      color: AppTheme.surface,
+                      borderRadius: BorderRadius.circular(14),
+                      border:
+                          Border.all(color: AppTheme.secondary.withAlpha(55))),
+                  child: const Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(Icons.notifications_active_outlined,
+                            size: 18, color: AppTheme.secondary),
+                        SizedBox(width: 10),
+                        Expanded(
+                            child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                              Text('Avisos de precios y lanzamientos',
+                                  style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w800)),
+                              SizedBox(height: 3),
+                              Text(
+                                  'Android consulta los precios en segundo plano con conexión; el sistema puede retrasar la revisión. Los lanzamientos se programan para un día antes y la fecha anunciada. Activa el permiso de notificaciones.',
+                                  style: TextStyle(
+                                      color: AppTheme.textSecondary,
+                                      fontSize: 10,
+                                      height: 1.3)),
+                            ])),
+                      ]))),
+          if (_isLoading)
+            const SliverFillRemaining(
+                child: Center(child: CircularProgressIndicator()))
+          else if (_alerts.isEmpty && _releaseAlerts.isEmpty)
+            const SliverFillRemaining(
+                hasScrollBody: false,
+                child: EmptyStateView(
+                    icon: Icons.notifications_off_outlined,
+                    title: 'No tienes alertas activas',
+                    message:
+                        'Crea una alerta de precio desde una ficha o un aviso de salida desde Preventas.'))
+          else
+            SliverList.builder(
+                itemCount: _releaseAlerts.length + _alerts.length,
+                itemBuilder: (context, index) => index < _releaseAlerts.length
+                    ? _releaseCard(_releaseAlerts[index])
+                    : _priceCard(_alerts[index - _releaseAlerts.length])),
+          const SliverToBoxAdapter(child: SizedBox(height: 24)),
+        ]),
+      );
 }

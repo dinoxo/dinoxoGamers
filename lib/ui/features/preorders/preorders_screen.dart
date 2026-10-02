@@ -8,6 +8,11 @@ import '../../../data/datasources/preorder_source.dart';
 import '../../../data/repositories/game_repository.dart';
 import '../../../domain/models/preorder_game.dart';
 import '../game_details/game_details_screen.dart';
+import '../../core/widgets/gaming_header.dart';
+import '../../core/widgets/platform_filter.dart';
+import '../../core/widgets/game_card_frame.dart';
+import '../../core/widgets/platform_badge.dart';
+import '../../core/widgets/usa_badge.dart';
 
 class PreordersScreen extends StatefulWidget {
   const PreordersScreen({
@@ -212,86 +217,57 @@ class _PreordersScreenState extends State<PreordersScreen> {
   Widget _card(PreorderGame game) {
     final date = game.releaseDate;
     final canAlert = date != null && game.daysRemaining(DateTime.now())! > 0;
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-      shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
-          side: BorderSide(color: AppTheme.platformColor(game.platform))),
-      child: InkWell(
+    final color =
+        Color.lerp(AppTheme.platformColor(game.platform), Colors.white, .45)!;
+    return GameCardFrame(
+        platform: game.platform,
+        coverUrl: game.coverUrl,
         onTap: () => _open(game),
-        borderRadius: BorderRadius.circular(14),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: SizedBox(
-                width: 84,
-                height: 112,
-                child: game.coverUrl.isEmpty
-                    ? const Icon(Icons.sports_esports, size: 48)
-                    : Image.network(game.coverUrl,
-                        fit: BoxFit.cover,
-                        cacheWidth: 252,
-                        errorBuilder: (_, __, ___) =>
-                            const Icon(Icons.sports_esports)),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-                child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                  Text(game.title,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                          fontSize: 15, fontWeight: FontWeight.w700)),
-                  const SizedBox(height: 5),
-                  Text(
-                      game.publisher.isEmpty
-                          ? 'Compañía por confirmar'
-                          : game.publisher,
-                      style: const TextStyle(
-                          color: AppTheme.textSecondary, fontSize: 12)),
-                  const SizedBox(height: 7),
-                  Wrap(spacing: 4, runSpacing: 4, children: [
-                    Chip(
-                        label: Text(
-                            AppConstants.platformDisplayName(game.platform))),
-                    ...game.consoles.map((c) => Chip(label: Text(c))),
-                  ]),
-                  Text(_countdown(game),
-                      style: const TextStyle(
-                          color: AppTheme.secondary,
-                          fontWeight: FontWeight.w800)),
-                  if (date != null)
-                    Text('${date.day}/${date.month}/${date.year} · USA',
-                        style: const TextStyle(
-                            color: AppTheme.textMuted, fontSize: 12)),
-                  Text(
-                      game.isPreorder
-                          ? 'Preventa disponible'
-                          : 'Próximo lanzamiento',
-                      style: const TextStyle(
-                          color: AppTheme.textSecondary, fontSize: 11)),
-                  Wrap(spacing: 8, children: [
-                    TextButton(
-                        onPressed: () => _open(game),
-                        child: const Text('Ver detalles')),
-                    if (canAlert)
-                      TextButton.icon(
-                        onPressed: () => _saveAlert(game),
-                        icon: const Icon(Icons.notifications_active_outlined,
-                            size: 18),
-                        label: const Text('Avisarme'),
-                      ),
-                  ]),
-                ])),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Wrap(spacing: 4, runSpacing: 4, children: [
+            PlatformBadge(platform: game.platform, compact: true),
+            const UsaBadge(compact: true)
           ]),
-        ),
-      ),
-    );
+          const SizedBox(height: 8),
+          Text(game.title,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                  fontSize: 15, fontWeight: FontWeight.w800, height: 1.2)),
+          const SizedBox(height: 4),
+          Text(game.consoles.join(' / '),
+              style:
+                  const TextStyle(fontSize: 11, color: AppTheme.textSecondary)),
+          if (game.publisher.isNotEmpty)
+            Text(game.publisher,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style:
+                    const TextStyle(fontSize: 10, color: AppTheme.textMuted)),
+          const SizedBox(height: 8),
+          Text(_countdown(game),
+              style: TextStyle(
+                  color: color, fontSize: 16, fontWeight: FontWeight.w900)),
+          if (date != null)
+            Text('${date.day}/${date.month}/${date.year} · USA',
+                style: const TextStyle(
+                    color: AppTheme.textSecondary, fontSize: 11)),
+          Text(game.isPreorder ? 'Preventa disponible' : 'Próximo lanzamiento',
+              style: const TextStyle(color: AppTheme.textMuted, fontSize: 10)),
+          const SizedBox(height: 6),
+          Wrap(spacing: 4, children: [
+            if (canAlert)
+              TextButton.icon(
+                  onPressed: () => _saveAlert(game),
+                  icon:
+                      const Icon(Icons.notifications_active_outlined, size: 16),
+                  label: const Text('Avisarme')),
+            TextButton.icon(
+                onPressed: () => _open(game),
+                icon: const Icon(Icons.chevron_right_rounded, size: 18),
+                label: const Text('Ver detalles')),
+          ]),
+        ]));
   }
 
   @override
@@ -302,95 +278,92 @@ class _PreordersScreenState extends State<PreordersScreen> {
           child: Builder(builder: _buildPage));
 
   Widget _buildPage(BuildContext context) {
-    final activeGames = _platform == null
+    final active = _platform == null
         ? _games
         : _games.where((game) => game.platform == _platform).toList();
-    final sorted = _sortedGames(activeGames);
-    final platformsToShow =
-        _platform == null ? GamePlatform.values : [_platform!];
-    final grouped = <GamePlatform, List<PreorderGame>>{
-      for (final platform in platformsToShow)
-        platform: sorted.where((game) => game.platform == platform).toList(),
-    };
+    final sorted = _sortedGames(active);
+    final platforms = _platform == null ? GamePlatform.values : [_platform!];
+    final rows = <Object>[];
+    for (final platform in platforms) {
+      final games = sorted.where((game) => game.platform == platform);
+      if (games.isNotEmpty) {
+        rows.add(platform);
+        rows.addAll(games);
+      }
+    }
     return Scaffold(
-      appBar: AppBar(title: const Text('Preventas')),
-      body: Column(children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(14, 14, 14, 6),
-          child: TextField(
-            controller: _search,
-            onChanged: _onSearchChanged,
-            onSubmitted: (_) {
-              setState(() => _suggestions = []);
-              _load();
-            },
-            decoration: const InputDecoration(
-              prefixIcon: Icon(Icons.search),
-              hintText: 'Buscar solo próximos lanzamientos',
-            ),
-          ),
-        ),
-        SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-            child: Row(children: [
-              for (final p in <GamePlatform?>[null, ...GamePlatform.values])
-                Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: ChoiceChip(
-                        label: Text(p == null
-                            ? 'Todas'
-                            : AppConstants.platformDisplayName(p)),
-                        selected: p == _platform,
-                        onSelected: (_) {
-                          setState(() => _platform = p);
-                        })),
-            ])),
-        if (_suggestions.isNotEmpty)
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxHeight: 180),
-            child: ListView(
-              shrinkWrap: true,
-              children: _suggestions
-                  .map((title) => ListTile(
-                        dense: true,
-                        title: Text(title,
-                            maxLines: 1, overflow: TextOverflow.ellipsis),
-                        onTap: () => _chooseSuggestion(title),
-                      ))
-                  .toList(),
-            ),
-          ),
-        Expanded(
-            child: RefreshIndicator(
+      appBar: GamingHeader.adaptive(context,
+          title: 'Preventas',
+          subtitle: 'Tu próxima aventura. Sigue su cuenta regresiva.',
+          accent: _platform == null
+              ? AppTheme.secondary
+              : AppTheme.platformColor(_platform!)),
+      body: RefreshIndicator(
           onRefresh: () => _load(),
-          child: ListView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              children: [
+          child: CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            slivers: [
+              SliverToBoxAdapter(
+                  child: Column(children: [
+                Padding(
+                    padding: const EdgeInsets.fromLTRB(14, 12, 14, 4),
+                    child: TextField(
+                        controller: _search,
+                        onChanged: _onSearchChanged,
+                        onSubmitted: (_) {
+                          setState(() => _suggestions = []);
+                          _load();
+                        },
+                        decoration: const InputDecoration(
+                            prefixIcon: Icon(Icons.search),
+                            hintText: 'Buscar solo próximos lanzamientos'))),
+                PlatformFilter(
+                    selected: _platform,
+                    onChanged: (p) => setState(() => _platform = p)),
+                if (_suggestions.isNotEmpty)
+                  ConstrainedBox(
+                      constraints: const BoxConstraints(maxHeight: 180),
+                      child: ListView(
+                          shrinkWrap: true,
+                          children: _suggestions
+                              .map((title) => ListTile(
+                                  dense: true,
+                                  title: Text(title,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis),
+                                  onTap: () => _chooseSuggestion(title)))
+                              .toList())),
                 const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 5),
-                  child: Text(
-                      'Lanzamientos anunciados y preventas en tiendas USA. La fecha puede variar por consola.',
-                      style: TextStyle(
-                          color: AppTheme.textSecondary, fontSize: 12)),
-                ),
+                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    child: Text(
+                        'Lanzamientos anunciados y preventas en tiendas USA. La fecha puede variar por consola.',
+                        style: TextStyle(
+                            color: AppTheme.textSecondary, fontSize: 10))),
                 if (_error != null)
                   Padding(
                       padding: const EdgeInsets.all(16),
                       child: Text(_error!,
                           style: const TextStyle(color: AppTheme.warning))),
-                for (final platform in platformsToShow)
-                  if (grouped[platform]!.isNotEmpty) ...[
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 18, 16, 6),
-                      child: Text(AppConstants.platformDisplayName(platform),
-                          style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w800,
-                              color: AppTheme.platformColor(platform))),
-                    ),
-                    ...grouped[platform]!.map(_card),
-                  ],
+              ])),
+              SliverList.builder(
+                  itemCount: rows.length,
+                  itemBuilder: (context, index) {
+                    final row = rows[index];
+                    if (row is PreorderGame) return _card(row);
+                    final platform = row as GamePlatform;
+                    return Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
+                        child: Text(AppConstants.platformDisplayName(platform),
+                            style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w800,
+                                color: Color.lerp(
+                                    AppTheme.platformColor(platform),
+                                    Colors.white,
+                                    .4))));
+                  }),
+              SliverToBoxAdapter(
+                  child: Column(children: [
                 if (!_loading && sorted.isEmpty && _error == null)
                   const Padding(
                       padding: EdgeInsets.all(24),
@@ -404,12 +377,12 @@ class _PreordersScreenState extends State<PreordersScreen> {
                   Padding(
                       padding: const EdgeInsets.all(16),
                       child: OutlinedButton(
-                        onPressed: () => _load(more: true),
-                        child: const Text('Cargar más lanzamientos'),
-                      )),
-              ]),
-        )),
-      ]),
+                          onPressed: () => _load(more: true),
+                          child: const Text('Cargar más lanzamientos'))),
+                const SizedBox(height: 24),
+              ])),
+            ],
+          )),
     );
   }
 }

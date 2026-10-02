@@ -2,6 +2,26 @@
 
 Todas las modificaciones notables de este proyecto se documentan en este archivo.
 
+## [1.9.0+10] - 2026-10-01
+
+### Interfaz y Rediseño Gamer
+- **Estilo Gamer Oscuro Unificado:** Cabeceras con el logo Dinoxo, superficies azul oscuro, búsqueda luminosa y bordes redondeados en todos los módulos.
+- **Tarjetas Horizontales de Juegos:** Rediseño con portada al borde izquierdo, insignias de precio real, descuento, accesibilidad y colores oficiales por compañía (PlayStation azul, Nintendo rojo, Xbox verde) en ofertas, búsquedas, suscripciones, preventas, biblioteca y alertas.
+- **Navegación con Menú Más:** Barra inferior con seis accesos: Ofertas, Buscar, Plus, Preventas, Mis Alertas y Más. La sección Más centraliza Dinoxo Store, Noticias, Biblioteca/Comparador e información de la app.
+- **Ofertas con Ordenamiento e Importes:** Selectores de importe y orden sobre los resultados; renderizado eficiente según el área visible y desplazamiento automático de controles al desplegar el teclado.
+
+### Añadido
+- **Módulo de Noticias Gaming:** Feed en vivo con las últimas noticias de videojuegos desde 3DJuegos, Vandal y Metacritic. Incluye motor de búsqueda por texto, filtro por portal y acceso directo al artículo original en el navegador.
+- **Tematización Dinámica en Ofertas:** La pantalla de ofertas ahora adopta automáticamente la identidad de color oficial de PlayStation, Nintendo o Xbox según la compañía seleccionada.
+- **Acceso Rápido a Menú en Buscar:** Se sustituyó el menú lateral desplegable por gestos (drawer) por un acceso directo en la barra superior al lado del escáner de cámara, evitando interferencias con los gestos de navegación de Android.
+- **Filtros por Consola y Prioridad en Preventas:** Chips de filtrado por plataforma (`Todas`, `PlayStation`, `Nintendo`, `Xbox`) y ordenamiento prioritario para posicionar al inicio los lanzamientos más esperados por la comunidad (GTA 6, Zelda: Ocarina of Time, Metroid Prime 4, etc.).
+
+### Alcance
+- Empaquetado en APK Release único universal `DinoxoGamers-V1.9.apk`, versión `1.9.0+10`.
+
+### Verificación
+- 142 pruebas automatizadas aprobadas y 0 incidencias en el análisis estático de código.
+
 ## [1.8.0+9] - 2026-10-01
 
 ### Añadido

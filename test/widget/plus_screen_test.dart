@@ -32,6 +32,24 @@ class _PlusGameRepository extends TestRepository {
 }
 
 void main() {
+  testWidgets('Plus retains the visible query when changing categories',
+      (tester) async {
+    final service = SubscriptionService(
+        source: TestSubscriptionSource([subscription()]),
+        clock: () => DateTime(2026, 9, 28));
+    await service.refresh();
+    await tester.pumpWidget(
+        MaterialApp(home: PlusScreen(service: service, autoLoad: false)));
+    await tester.enterText(find.byType(TextField), 'Resident');
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.ensureVisible(find.text(SubscriptionCategory.monthly.label));
+    await tester.tap(find.text(SubscriptionCategory.monthly.label));
+    await tester.pumpAndSettle();
+    expect(
+        tester.widget<EditableText>(find.byType(EditableText)).controller.text,
+        'Resident');
+    expect(tester.takeException(), isNull);
+  });
   testWidgets(
       'Nintendo opens internal plans, emulator library and DLC benefits',
       (tester) async {

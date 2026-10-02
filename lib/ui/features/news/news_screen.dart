@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import '../../core/widgets/gaming_header.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/theme/app_theme.dart';
@@ -222,8 +223,10 @@ class _NewsScreenState extends State<NewsScreen> {
     }).toList();
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Noticias'),
+      appBar: GamingHeader.adaptive(
+        context,
+        title: 'Noticias',
+        subtitle: 'La actualidad del mundo gamer, en un solo lugar.',
         actions: [
           IconButton(
             tooltip: 'Actualizar noticias',

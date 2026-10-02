@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
-import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_theme.dart';
 import '../../data/repositories/game_repository.dart';
 import '../../domain/models/release_alert.dart';
@@ -10,10 +9,9 @@ import '../../domain/services/notification_service.dart';
 import '../../domain/services/subscription_service.dart';
 import '../features/alerts/alerts_screen.dart';
 import '../features/deals/deals_screen.dart';
-import '../features/news/news_screen.dart';
+import '../features/more/more_screen.dart';
 import '../features/preorders/preorders_screen.dart';
 import '../features/search/search_screen.dart';
-import '../features/store/dinoxo_store_screen.dart';
 import '../features/subscriptions/plus_screen.dart';
 
 class MainShell extends StatefulWidget {
@@ -53,9 +51,8 @@ class _MainShellState extends State<MainShell> {
       PreordersScreen(
           repository: widget.repository,
           onCreateReleaseAlert: _createReleaseAlert),
-      const NewsScreen(),
       AlertsScreen(repository: widget.repository),
-      const DinoxoStoreScreen(),
+      MoreScreen(repository: widget.repository),
     ];
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkFirstRunPermissions();
@@ -279,54 +276,60 @@ class _MainShellState extends State<MainShell> {
             _visited.contains(i) ? _screens[i] : const SizedBox.shrink()
         ],
       ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        type: BottomNavigationBarType.fixed,
-        onTap: (index) {
-          setState(() {
-            _visited.add(index);
-            _currentIndex = index;
-          });
-          if (index == 2) SubscriptionService.instance.ensureLoaded();
-        },
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.local_offer_outlined),
-            activeIcon: Icon(Icons.local_offer),
-            label: 'Ofertas',
+      bottomNavigationBar: Container(
+          decoration: BoxDecoration(
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
+            border: Border.all(color: AppTheme.secondary.withAlpha(70)),
+            boxShadow: [
+              BoxShadow(color: AppTheme.secondary.withAlpha(22), blurRadius: 20)
+            ],
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.search),
-            activeIcon: Icon(Icons.search),
-            label: 'Buscar',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.card_membership_outlined),
-            activeIcon: Icon(Icons.card_membership_rounded),
-            label: 'Plus',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.event_outlined),
-            activeIcon: Icon(Icons.event),
-            label: 'Preventas',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.newspaper_outlined),
-            activeIcon: Icon(Icons.newspaper),
-            label: 'Noticias',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.notifications_none),
-            activeIcon: Icon(Icons.notifications),
-            label: 'Mis Alertas',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.storefront_outlined),
-            activeIcon: Icon(Icons.storefront),
-            label: 'Dinoxo Store',
-          ),
-        ],
-      ),
+          child: ClipRRect(
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(22)),
+              child: BottomNavigationBar(
+                currentIndex: _currentIndex,
+                type: BottomNavigationBarType.fixed,
+                onTap: (index) {
+                  setState(() {
+                    _visited.add(index);
+                    _currentIndex = index;
+                  });
+                  if (index == 2) SubscriptionService.instance.ensureLoaded();
+                },
+                items: const [
+                  BottomNavigationBarItem(
+                    icon: Icon(Icons.local_offer_outlined),
+                    activeIcon: Icon(Icons.local_offer),
+                    label: 'Ofertas',
+                  ),
+                  BottomNavigationBarItem(
+                    icon: Icon(Icons.search),
+                    activeIcon: Icon(Icons.search),
+                    label: 'Buscar',
+                  ),
+                  BottomNavigationBarItem(
+                    icon: Icon(Icons.card_membership_outlined),
+                    activeIcon: Icon(Icons.card_membership_rounded),
+                    label: 'Plus',
+                  ),
+                  BottomNavigationBarItem(
+                    icon: Icon(Icons.event_outlined),
+                    activeIcon: Icon(Icons.event),
+                    label: 'Preventas',
+                  ),
+                  BottomNavigationBarItem(
+                    icon: Icon(Icons.notifications_none),
+                    activeIcon: Icon(Icons.notifications),
+                    label: 'Mis Alertas',
+                  ),
+                  BottomNavigationBarItem(
+                    icon: Icon(Icons.more_horiz_rounded),
+                    activeIcon: Icon(Icons.more_horiz_rounded),
+                    label: 'Más',
+                  ),
+                ],
+              ))),
     );
   }
 }

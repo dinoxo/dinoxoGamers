@@ -1,7 +1,5 @@
 import 'dart:convert';
-import 'package:html/parser.dart' as html;
 import 'package:http/http.dart' as http;
-import 'package:intl/intl.dart';
 
 import '../../domain/models/news_article.dart';
 
@@ -60,7 +58,8 @@ class NewsSource {
         .timeout(const Duration(seconds: 15));
     if (response.statusCode != 200) return [];
     final body = utf8.decode(response.bodyBytes, allowMalformed: true);
-    return parseRss(body, NewsPortal.tresDJuegos, defaultHost: 'https://www.3djuegos.com');
+    return parseRss(body, NewsPortal.tresDJuegos,
+        defaultHost: 'https://www.3djuegos.com');
   }
 
   Future<List<NewsArticle>> fetchVandal() async {
@@ -76,7 +75,8 @@ class NewsSource {
     } catch (_) {
       body = latin1.decode(response.bodyBytes);
     }
-    return parseRss(body, NewsPortal.vandal, defaultHost: 'https://vandal.elespanol.com');
+    return parseRss(body, NewsPortal.vandal,
+        defaultHost: 'https://vandal.elespanol.com');
   }
 
   Future<List<NewsArticle>> fetchMetacritic() async {
@@ -86,7 +86,8 @@ class NewsSource {
         .get(uri, headers: _headers)
         .timeout(const Duration(seconds: 15));
     if (response.statusCode != 200) return [];
-    final json = jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
+    final json =
+        jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
     final data = json['data'] as Map<String, dynamic>?;
     final items = (data?['items'] as List<dynamic>?) ?? [];
     final articles = <NewsArticle>[];
@@ -105,7 +106,8 @@ class NewsSource {
       DateTime? pubDate;
       final dateObj = item['datePublished'];
       if (dateObj is Map<String, dynamic> && dateObj['date'] != null) {
-        pubDate = DateTime.tryParse(dateObj['date'].toString().replaceAll(' ', 'T'));
+        pubDate =
+            DateTime.tryParse(dateObj['date'].toString().replaceAll(' ', 'T'));
       }
 
       if (title.isNotEmpty && url.isNotEmpty) {
@@ -114,7 +116,8 @@ class NewsSource {
           title: title.trim(),
           description: desc.trim(),
           url: url,
-          imageUrl: (imgPath != null && imgPath.startsWith('http')) ? imgPath : null,
+          imageUrl:
+              (imgPath != null && imgPath.startsWith('http')) ? imgPath : null,
           publishedAt: pubDate,
           portal: NewsPortal.metacritic,
         ));
@@ -123,23 +126,37 @@ class NewsSource {
     return articles;
   }
 
-  static List<NewsArticle> parseRss(String xmlBody, NewsPortal portal, {required String defaultHost}) {
+  static List<NewsArticle> parseRss(String xmlBody, NewsPortal portal,
+      {required String defaultHost}) {
     final articles = <NewsArticle>[];
-    final items = RegExp(r'<item>([\s\S]*?)</item>', caseSensitive: false).allMatches(xmlBody);
+    final items = RegExp(r'<item>([\s\S]*?)</item>', caseSensitive: false)
+        .allMatches(xmlBody);
 
     for (final match in items) {
       final itemContent = match.group(1) ?? '';
-      final titleMatch = RegExp(r'<title>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?</title>', caseSensitive: false)
+      final titleMatch = RegExp(
+              r'<title>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?</title>',
+              caseSensitive: false)
           .firstMatch(itemContent);
-      final linkMatch = RegExp(r'<link>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?</link>', caseSensitive: false)
+      final linkMatch = RegExp(
+              r'<link>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?</link>',
+              caseSensitive: false)
           .firstMatch(itemContent);
-      final descMatch = RegExp(r'<description>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?</description>', caseSensitive: false)
+      final descMatch = RegExp(
+              r'<description>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?</description>',
+              caseSensitive: false)
           .firstMatch(itemContent);
-      final dateMatch = RegExp(r'<pubDate>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?</pubDate>', caseSensitive: false)
+      final dateMatch = RegExp(
+              r'<pubDate>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?</pubDate>',
+              caseSensitive: false)
           .firstMatch(itemContent);
-      final enclosureMatch = RegExp(r'<enclosure[^>]+url=["\x27]([^"\x27]+)["\x27]', caseSensitive: false)
+      final enclosureMatch = RegExp(
+              r'<enclosure[^>]+url=["\x27]([^"\x27]+)["\x27]',
+              caseSensitive: false)
           .firstMatch(itemContent);
-      final mediaMatch = RegExp(r'<media:content[^>]+url=["\x27]([^"\x27]+)["\x27]', caseSensitive: false)
+      final mediaMatch = RegExp(
+              r'<media:content[^>]+url=["\x27]([^"\x27]+)["\x27]',
+              caseSensitive: false)
           .firstMatch(itemContent);
 
       final rawTitle = titleMatch?.group(1)?.trim() ?? '';
@@ -152,7 +169,9 @@ class NewsSource {
       // Extract image URL from enclosure, media:content or <img> in description
       String? imageUrl = enclosureMatch?.group(1) ?? mediaMatch?.group(1);
       if (imageUrl == null && rawDesc.isNotEmpty) {
-        final imgInDesc = RegExp(r'<img[^>]+src=["\x27]([^"\x27]+)["\x27]', caseSensitive: false).firstMatch(rawDesc);
+        final imgInDesc = RegExp(r'<img[^>]+src=["\x27]([^"\x27]+)["\x27]',
+                caseSensitive: false)
+            .firstMatch(rawDesc);
         imageUrl = imgInDesc?.group(1);
       }
 
@@ -170,7 +189,8 @@ class NewsSource {
         title: _cleanText(rawTitle),
         description: cleanDesc,
         url: rawLink.startsWith('http') ? rawLink : '$defaultHost$rawLink',
-        imageUrl: (imageUrl != null && imageUrl.startsWith('http')) ? imageUrl : null,
+        imageUrl:
+            (imageUrl != null && imageUrl.startsWith('http')) ? imageUrl : null,
         publishedAt: pubDate,
         portal: portal,
       ));
@@ -190,8 +210,18 @@ class NewsSource {
   }
 
   static final _months = {
-    'jan': 1, 'feb': 2, 'mar': 3, 'apr': 4, 'may': 5, 'jun': 6,
-    'jul': 7, 'aug': 8, 'sep': 9, 'oct': 10, 'nov': 11, 'dec': 12,
+    'jan': 1,
+    'feb': 2,
+    'mar': 3,
+    'apr': 4,
+    'may': 5,
+    'jun': 6,
+    'jul': 7,
+    'aug': 8,
+    'sep': 9,
+    'oct': 10,
+    'nov': 11,
+    'dec': 12,
   };
 
   static DateTime? _parseRssDate(String dateStr) {
@@ -212,7 +242,11 @@ class NewsSource {
       final minute = int.tryParse(match.group(5)!);
       final second = int.tryParse(match.group(6) ?? '0');
 
-      if (day != null && month != null && year != null && hour != null && minute != null) {
+      if (day != null &&
+          month != null &&
+          year != null &&
+          hour != null &&
+          minute != null) {
         return DateTime.utc(year, month, day, hour, minute, second ?? 0);
       }
     }
